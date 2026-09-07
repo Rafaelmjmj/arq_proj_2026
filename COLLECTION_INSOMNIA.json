@@ -1,0 +1,174 @@
+{
+  "_type": "export",
+  "__export_format": 4,
+  "__export_date": "2026-08-02T00:00:00.000Z",
+  "__export_source": "trokr-scaffold",
+  "resources": [
+    {
+      "_id": "wrk_trokr",
+      "_type": "workspace",
+      "parentId": null,
+      "name": "Trokr API",
+      "description": "CRUD de Usuario e Item — Aulas 1 a 3"
+    },
+    {
+      "_id": "env_base",
+      "_type": "environment",
+      "parentId": "wrk_trokr",
+      "name": "Ambiente Local",
+      "data": {
+        "base_url": "http://localhost:8080"
+      }
+    },
+    {
+      "_id": "fld_usuarios",
+      "_type": "request_group",
+      "parentId": "wrk_trokr",
+      "name": "Usuarios"
+    },
+    {
+      "_id": "req_usuarios_listar",
+      "_type": "request",
+      "parentId": "fld_usuarios",
+      "name": "Listar Usuarios",
+      "method": "GET",
+      "url": "{{ _.base_url }}/usuarios",
+      "headers": []
+    },
+    {
+      "_id": "req_usuarios_buscar",
+      "_type": "request",
+      "parentId": "fld_usuarios",
+      "name": "Buscar Usuario por Id",
+      "method": "GET",
+      "url": "{{ _.base_url }}/usuarios/1",
+      "headers": []
+    },
+    {
+      "_id": "req_usuarios_criar",
+      "_type": "request",
+      "parentId": "fld_usuarios",
+      "name": "Criar Usuario",
+      "method": "POST",
+      "url": "{{ _.base_url }}/usuarios",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"nome\": \"Maria Silva\",\n  \"email\": \"maria@example.com\"\n}"
+      },
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" }
+      ]
+    },
+    {
+      "_id": "req_usuarios_atualizar",
+      "_type": "request",
+      "parentId": "fld_usuarios",
+      "name": "Atualizar Usuario",
+      "method": "PUT",
+      "url": "{{ _.base_url }}/usuarios/1",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"nome\": \"Maria Silva Santos\",\n  \"email\": \"maria.santos@example.com\"\n}"
+      },
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" }
+      ]
+    },
+    {
+      "_id": "req_usuarios_remover",
+      "_type": "request",
+      "parentId": "fld_usuarios",
+      "name": "Remover Usuario",
+      "method": "DELETE",
+      "url": "{{ _.base_url }}/usuarios/1",
+      "headers": []
+    },
+    {
+      "_id": "fld_itens",
+      "_type": "request_group",
+      "parentId": "wrk_trokr",
+      "name": "Itens"
+    },
+    {
+      "_id": "req_itens_listar",
+      "_type": "request",
+      "parentId": "fld_itens",
+      "name": "Listar Itens",
+      "method": "GET",
+      "url": "{{ _.base_url }}/itens",
+      "headers": []
+    },
+    {
+      "_id": "req_itens_buscar",
+      "_type": "request",
+      "parentId": "fld_itens",
+      "name": "Buscar Item por Id",
+      "method": "GET",
+      "url": "{{ _.base_url }}/itens/1",
+      "headers": []
+    },
+    {
+      "_id": "req_itens_criar",
+      "_type": "request",
+      "parentId": "fld_itens",
+      "name": "Criar Item",
+      "method": "POST",
+      "url": "{{ _.base_url }}/itens",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"titulo\": \"Aula de violão\",\n  \"descricao\": \"Aula básica de 1 hora, para iniciantes\",\n  \"usuarioId\": 1\n}"
+      },
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" }
+      ]
+    },
+    {
+      "_id": "req_itens_atualizar",
+      "_type": "request",
+      "parentId": "fld_itens",
+      "name": "Atualizar Item",
+      "method": "PUT",
+      "url": "{{ _.base_url }}/itens/1",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"titulo\": \"Aula de violão (avançado)\",\n  \"descricao\": \"Aula de 1 hora, para quem já toca o básico\",\n  \"usuarioId\": 1\n}"
+      },
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" }
+      ]
+    },
+    {
+      "_id": "req_itens_remover",
+      "_type": "request",
+      "parentId": "fld_itens",
+      "name": "Remover Item",
+      "method": "DELETE",
+      "url": "{{ _.base_url }}/itens/1",
+      "headers": []
+    },
+    {
+      "_id": "fld_infra",
+      "_type": "request_group",
+      "parentId": "wrk_trokr",
+      "name": "Infra"
+    },
+    {
+      "_id": "req_health",
+      "_type": "request",
+      "parentId": "fld_infra",
+      "name": "Health Check",
+      "method": "GET",
+      "url": "{{ _.base_url }}/actuator/health",
+      "headers": []
+    },
+    {
+      "_id": "req_hello",
+      "_type": "request",
+      "parentId": "fld_infra",
+      "name": "Hello World",
+      "method": "GET",
+      "url": "{{ _.base_url }}/hello",
+      "headers": []
+    }
+  ]
+}

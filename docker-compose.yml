@@ -1,0 +1,39 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: trokr-db
+    restart: unless-stopped
+    environment:
+      # Valores de exemplo para desenvolvimento local — nunca use senhas
+      # assim fora do ambiente local da disciplina.
+      POSTGRES_DB: trokr_db
+      POSTGRES_USER: trokr_user
+      POSTGRES_PASSWORD: changeme_local_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - trokr-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U trokr_user -d trokr_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build: .
+    container_name: trokr-app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: trokr_db
+      DB_USER: trokr_user
+      DB_PASSWORD: changeme_local_dev
+    ports:
+      - "8090:8080"
+
+volumes:
+  trokr-db-data:
