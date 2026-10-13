@@ -1,0 +1,39 @@
+@startuml
+' Máquina da Proposta RAIZ (propostaPai == null) — interface EstadoProposta
+
+[*] --> Rascunho
+
+Rascunho --> Homologacao : submeter
+Rascunho --> Cancelado_Raiz : cancelar
+
+Homologacao --> Ativa : aprovar
+Homologacao --> Rascunho : editar
+Homologacao --> Cancelado_Raiz : cancelar
+
+Ativa --> Negociado_Raiz : dono aceita uma contraproposta
+Ativa --> Rascunho : editar
+Ativa --> Cancelado_Raiz : cancelar
+
+Negociado_Raiz --> Finalizado : finalizar (troca realizada)
+Negociado_Raiz --> Ativa : uma parte desiste da negociação
+Negociado_Raiz --> Cancelado_Raiz : cancelar
+
+Finalizado --> [*]
+Cancelado_Raiz --> [*]
+
+note right of Ativa
+  Único estado que recebe
+  contrapropostas.
+end note
+
+note right of Finalizado
+  Publica TrocaConcluidaEvent
+  (Observer, via PropostaService).
+end note
+
+note bottom of Cancelado_Raiz
+  Efeito cascata: as contrapropostas
+  abertas são encerradas.
+end note
+
+@enduml

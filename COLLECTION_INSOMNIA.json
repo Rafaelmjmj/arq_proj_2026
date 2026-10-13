@@ -1,0 +1,657 @@
+{
+  "_type": "export",
+  "__export_format": 4,
+  "__export_date": "2026-09-29T00:00:00.000Z",
+  "__export_source": "trokr-entrega2",
+  "resources": [
+    {
+      "_id": "wrk_trokr",
+      "_type": "workspace",
+      "parentId": null,
+      "name": "Trokr API",
+      "description": "Entrega 2 — State, Observer, Adapter, Strategy e Facade"
+    },
+    {
+      "_id": "env_base",
+      "_type": "environment",
+      "parentId": "wrk_trokr",
+      "name": "Ambiente Local",
+      "data": {
+        "base_url": "http://localhost:8090"
+      }
+    },
+    {
+      "_id": "fld_roteiro",
+      "_type": "request_group",
+      "parentId": "wrk_trokr",
+      "name": "0. Roteiro Aula 9 (rodar em ordem, banco zerado)"
+    },
+    {
+      "_id": "req_001",
+      "_type": "request",
+      "parentId": "fld_roteiro",
+      "name": "01 Criar usuário A (Ana)",
+      "method": "POST",
+      "url": "{{ _.base_url }}/usuarios",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"nome\": \"Ana\",\n  \"email\": \"ana@trokr.dev\",\n  \"cidade\": \"Formosa\"\n}"
+      }
+    },
+    {
+      "_id": "req_002",
+      "_type": "request",
+      "parentId": "fld_roteiro",
+      "name": "02 Criar usuário B (Bruno)",
+      "method": "POST",
+      "url": "{{ _.base_url }}/usuarios",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"nome\": \"Bruno\",\n  \"email\": \"bruno@trokr.dev\",\n  \"cidade\": \"Formosa\"\n}"
+      }
+    },
+    {
+      "_id": "req_003",
+      "_type": "request",
+      "parentId": "fld_roteiro",
+      "name": "03 Criar usuário C (Carla)",
+      "method": "POST",
+      "url": "{{ _.base_url }}/usuarios",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"nome\": \"Carla\",\n  \"email\": \"carla@trokr.dev\",\n  \"cidade\": \"Formosa\"\n}"
+      }
+    },
+    {
+      "_id": "req_004",
+      "_type": "request",
+      "parentId": "fld_roteiro",
+      "name": "04 Item de A — PRODUTO (id 1)",
+      "method": "POST",
+      "url": "{{ _.base_url }}/itens",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"titulo\": \"Bicicleta\",\n  \"descricao\": \"Aro 29, pouco uso\",\n  \"categoria\": \"PRODUTO\",\n  \"usuarioId\": 1\n}"
+      }
+    },
+    {
+      "_id": "req_005",
+      "_type": "request",
+      "parentId": "fld_roteiro",
+      "name": "05 Item de B — SERVICO (id 2)",
+      "method": "POST",
+      "url": "{{ _.base_url }}/itens",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"titulo\": \"Aula de violão\",\n  \"descricao\": \"1 hora, iniciantes\",\n  \"categoria\": \"SERVICO\",\n  \"usuarioId\": 2\n}"
+      }
+    },
+    {
+      "_id": "req_006",
+      "_type": "request",
+      "parentId": "fld_roteiro",
+      "name": "06 Item de C — EXPERIENCIA (id 3)",
+      "method": "POST",
+      "url": "{{ _.base_url }}/itens",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"titulo\": \"Passeio guiado\",\n  \"descricao\": \"Trilha no Salto de Itiquira\",\n  \"categoria\": \"EXPERIENCIA\",\n  \"usuarioId\": 3\n}"
+      }
+    },
+    {
+      "_id": "req_007",
+      "_type": "request",
+      "parentId": "fld_roteiro",
+      "name": "07 A cria proposta raiz (id 1)",
+      "method": "POST",
+      "url": "{{ _.base_url }}/propostas",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"titulo\": \"Troco minha bicicleta\",\n  \"descricao\": \"Aceito serviços ou experiências\",\n  \"usuarioId\": 1,\n  \"itemId\": 1\n}"
+      }
+    },
+    {
+      "_id": "req_008",
+      "_type": "request",
+      "parentId": "fld_roteiro",
+      "name": "08 ERRO esperado: aprovar em Rascunho (409)",
+      "method": "PATCH",
+      "url": "{{ _.base_url }}/propostas/1/aprovar",
+      "headers": []
+    },
+    {
+      "_id": "req_009",
+      "_type": "request",
+      "parentId": "fld_roteiro",
+      "name": "09 Submeter raiz (→ HOMOLOGACAO)",
+      "method": "PATCH",
+      "url": "{{ _.base_url }}/propostas/1/submeter",
+      "headers": []
+    },
+    {
+      "_id": "req_010",
+      "_type": "request",
+      "parentId": "fld_roteiro",
+      "name": "10 Aprovar raiz (→ ATIVA)",
+      "method": "PATCH",
+      "url": "{{ _.base_url }}/propostas/1/aprovar",
+      "headers": []
+    },
+    {
+      "_id": "req_011",
+      "_type": "request",
+      "parentId": "fld_roteiro",
+      "name": "11 B contrapropõe (id 2)",
+      "method": "POST",
+      "url": "{{ _.base_url }}/propostas/1/contrapropostas",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"descricao\": \"Ofereço uma aula de violão\",\n  \"usuarioId\": 2,\n  \"itemId\": 2\n}"
+      }
+    },
+    {
+      "_id": "req_012",
+      "_type": "request",
+      "parentId": "fld_roteiro",
+      "name": "12 C contrapropõe (id 3)",
+      "method": "POST",
+      "url": "{{ _.base_url }}/propostas/1/contrapropostas",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"descricao\": \"Ofereço um passeio guiado\",\n  \"usuarioId\": 3,\n  \"itemId\": 3\n}"
+      }
+    },
+    {
+      "_id": "req_013",
+      "_type": "request",
+      "parentId": "fld_roteiro",
+      "name": "13 Submeter contraproposta de B (→ EM_ANALISE)",
+      "method": "PATCH",
+      "url": "{{ _.base_url }}/propostas/2/submeter",
+      "headers": []
+    },
+    {
+      "_id": "req_014",
+      "_type": "request",
+      "parentId": "fld_roteiro",
+      "name": "14 Submeter contraproposta de C (→ EM_ANALISE)",
+      "method": "PATCH",
+      "url": "{{ _.base_url }}/propostas/3/submeter",
+      "headers": []
+    },
+    {
+      "_id": "req_015",
+      "_type": "request",
+      "parentId": "fld_roteiro",
+      "name": "15 Listar concorrentes da raiz",
+      "method": "GET",
+      "url": "{{ _.base_url }}/propostas/1/contrapropostas",
+      "headers": []
+    },
+    {
+      "_id": "req_016",
+      "_type": "request",
+      "parentId": "fld_roteiro",
+      "name": "16 ERRO esperado: B aceitar a própria (403)",
+      "method": "PATCH",
+      "url": "{{ _.base_url }}/propostas/2/aceitar?usuarioId=2",
+      "headers": []
+    },
+    {
+      "_id": "req_017",
+      "_type": "request",
+      "parentId": "fld_roteiro",
+      "name": "17 A aceita a de B (raiz e contra → NEGOCIADO)",
+      "method": "PATCH",
+      "url": "{{ _.base_url }}/propostas/2/aceitar?usuarioId=1",
+      "headers": []
+    },
+    {
+      "_id": "req_018",
+      "_type": "request",
+      "parentId": "fld_roteiro",
+      "name": "18 FINALIZAR (uma chamada — Facade)",
+      "method": "PATCH",
+      "url": "{{ _.base_url }}/propostas/1/finalizar",
+      "headers": []
+    },
+    {
+      "_id": "req_019",
+      "_type": "request",
+      "parentId": "fld_roteiro",
+      "name": "19 Conferir raiz FINALIZADO",
+      "method": "GET",
+      "url": "{{ _.base_url }}/propostas/1",
+      "headers": []
+    },
+    {
+      "_id": "req_020",
+      "_type": "request",
+      "parentId": "fld_roteiro",
+      "name": "20 Conferir C cancelada (cascata)",
+      "method": "GET",
+      "url": "{{ _.base_url }}/propostas/3",
+      "headers": []
+    },
+    {
+      "_id": "req_021",
+      "_type": "request",
+      "parentId": "fld_roteiro",
+      "name": "21 Conferir saldos (A=10, B=15, C=0)",
+      "method": "GET",
+      "url": "{{ _.base_url }}/usuarios",
+      "headers": []
+    },
+    {
+      "_id": "req_022",
+      "_type": "request",
+      "parentId": "fld_roteiro",
+      "name": "22 Conferir 2 avaliações pendentes",
+      "method": "GET",
+      "url": "{{ _.base_url }}/avaliacoes?propostaId=1",
+      "headers": []
+    },
+    {
+      "_id": "req_023",
+      "_type": "request",
+      "parentId": "fld_roteiro",
+      "name": "23 Conferir histórico",
+      "method": "GET",
+      "url": "{{ _.base_url }}/historicos?propostaId=1",
+      "headers": []
+    },
+    {
+      "_id": "req_024",
+      "_type": "request",
+      "parentId": "fld_roteiro",
+      "name": "24 Conferir log TROCA_CONCLUIDA (Mongo)",
+      "method": "GET",
+      "url": "{{ _.base_url }}/logs?tipo=TROCA_CONCLUIDA",
+      "headers": []
+    },
+    {
+      "_id": "req_025",
+      "_type": "request",
+      "parentId": "fld_roteiro",
+      "name": "25 A avalia B (confira o id no passo 22)",
+      "method": "PATCH",
+      "url": "{{ _.base_url }}/avaliacoes/1",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"usuarioId\": 1,\n  \"nota\": 5,\n  \"descricao\": \"Troca tranquila, aula excelente\"\n}"
+      }
+    },
+    {
+      "_id": "req_026",
+      "_type": "request",
+      "parentId": "fld_roteiro",
+      "name": "26 ERRO esperado: avaliar de novo (409)",
+      "method": "PATCH",
+      "url": "{{ _.base_url }}/avaliacoes/1",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"usuarioId\": 1,\n  \"nota\": 4,\n  \"descricao\": \"de novo\"\n}"
+      }
+    },
+    {
+      "_id": "req_027",
+      "_type": "request",
+      "parentId": "fld_roteiro",
+      "name": "27 Logs de transições inválidas (WARN)",
+      "method": "GET",
+      "url": "{{ _.base_url }}/logs?tipo=TRANSICAO_INVALIDA",
+      "headers": []
+    },
+    {
+      "_id": "fld_usuarios",
+      "_type": "request_group",
+      "parentId": "wrk_trokr",
+      "name": "Usuarios"
+    },
+    {
+      "_id": "req_028",
+      "_type": "request",
+      "parentId": "fld_usuarios",
+      "name": "Listar",
+      "method": "GET",
+      "url": "{{ _.base_url }}/usuarios",
+      "headers": []
+    },
+    {
+      "_id": "req_029",
+      "_type": "request",
+      "parentId": "fld_usuarios",
+      "name": "Buscar por id",
+      "method": "GET",
+      "url": "{{ _.base_url }}/usuarios/1",
+      "headers": []
+    },
+    {
+      "_id": "req_030",
+      "_type": "request",
+      "parentId": "fld_usuarios",
+      "name": "Buscar por email",
+      "method": "GET",
+      "url": "{{ _.base_url }}/usuarios/buscar?email=ana@trokr.dev",
+      "headers": []
+    },
+    {
+      "_id": "req_031",
+      "_type": "request",
+      "parentId": "fld_usuarios",
+      "name": "Buscar por nome",
+      "method": "GET",
+      "url": "{{ _.base_url }}/usuarios/buscar-nome?nome=an",
+      "headers": []
+    },
+    {
+      "_id": "req_032",
+      "_type": "request",
+      "parentId": "fld_usuarios",
+      "name": "Atualizar",
+      "method": "PUT",
+      "url": "{{ _.base_url }}/usuarios/1",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"nome\": \"Ana Souza\",\n  \"email\": \"ana@trokr.dev\",\n  \"cidade\": \"Formosa\"\n}"
+      }
+    },
+    {
+      "_id": "req_033",
+      "_type": "request",
+      "parentId": "fld_usuarios",
+      "name": "Remover",
+      "method": "DELETE",
+      "url": "{{ _.base_url }}/usuarios/1",
+      "headers": []
+    },
+    {
+      "_id": "fld_itens",
+      "_type": "request_group",
+      "parentId": "wrk_trokr",
+      "name": "Itens"
+    },
+    {
+      "_id": "req_034",
+      "_type": "request",
+      "parentId": "fld_itens",
+      "name": "Listar",
+      "method": "GET",
+      "url": "{{ _.base_url }}/itens",
+      "headers": []
+    },
+    {
+      "_id": "req_035",
+      "_type": "request",
+      "parentId": "fld_itens",
+      "name": "Buscar por id",
+      "method": "GET",
+      "url": "{{ _.base_url }}/itens/1",
+      "headers": []
+    },
+    {
+      "_id": "req_036",
+      "_type": "request",
+      "parentId": "fld_itens",
+      "name": "Buscar por título",
+      "method": "GET",
+      "url": "{{ _.base_url }}/itens/buscar?titulo=bici",
+      "headers": []
+    },
+    {
+      "_id": "req_037",
+      "_type": "request",
+      "parentId": "fld_itens",
+      "name": "Buscar por categoria",
+      "method": "GET",
+      "url": "{{ _.base_url }}/itens/buscar-categoria?categoria=SERVICO",
+      "headers": []
+    },
+    {
+      "_id": "req_038",
+      "_type": "request",
+      "parentId": "fld_itens",
+      "name": "Itens de um usuário",
+      "method": "GET",
+      "url": "{{ _.base_url }}/itens/buscar-itens-usuario/1",
+      "headers": []
+    },
+    {
+      "_id": "req_039",
+      "_type": "request",
+      "parentId": "fld_itens",
+      "name": "Atualizar",
+      "method": "PUT",
+      "url": "{{ _.base_url }}/itens/1",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"titulo\": \"Bicicleta\",\n  \"descricao\": \"Aro 29\",\n  \"categoria\": \"PRODUTO\",\n  \"usuarioId\": 1\n}"
+      }
+    },
+    {
+      "_id": "req_040",
+      "_type": "request",
+      "parentId": "fld_itens",
+      "name": "Remover",
+      "method": "DELETE",
+      "url": "{{ _.base_url }}/itens/1",
+      "headers": []
+    },
+    {
+      "_id": "fld_propostas",
+      "_type": "request_group",
+      "parentId": "wrk_trokr",
+      "name": "Propostas (transições)"
+    },
+    {
+      "_id": "req_041",
+      "_type": "request",
+      "parentId": "fld_propostas",
+      "name": "Listar todas",
+      "method": "GET",
+      "url": "{{ _.base_url }}/propostas",
+      "headers": []
+    },
+    {
+      "_id": "req_042",
+      "_type": "request",
+      "parentId": "fld_propostas",
+      "name": "Listar só raízes",
+      "method": "GET",
+      "url": "{{ _.base_url }}/propostas?apenasRaizes=true",
+      "headers": []
+    },
+    {
+      "_id": "req_043",
+      "_type": "request",
+      "parentId": "fld_propostas",
+      "name": "Propostas de um usuário",
+      "method": "GET",
+      "url": "{{ _.base_url }}/propostas/usuario/1",
+      "headers": []
+    },
+    {
+      "_id": "req_044",
+      "_type": "request",
+      "parentId": "fld_propostas",
+      "name": "Submeter",
+      "method": "PATCH",
+      "url": "{{ _.base_url }}/propostas/1/submeter",
+      "headers": []
+    },
+    {
+      "_id": "req_045",
+      "_type": "request",
+      "parentId": "fld_propostas",
+      "name": "Aprovar",
+      "method": "PATCH",
+      "url": "{{ _.base_url }}/propostas/1/aprovar",
+      "headers": []
+    },
+    {
+      "_id": "req_046",
+      "_type": "request",
+      "parentId": "fld_propostas",
+      "name": "Editar (volta p/ Rascunho)",
+      "method": "PATCH",
+      "url": "{{ _.base_url }}/propostas/1/editar",
+      "headers": []
+    },
+    {
+      "_id": "req_047",
+      "_type": "request",
+      "parentId": "fld_propostas",
+      "name": "Cancelar",
+      "method": "PATCH",
+      "url": "{{ _.base_url }}/propostas/1/cancelar",
+      "headers": []
+    },
+    {
+      "_id": "req_048",
+      "_type": "request",
+      "parentId": "fld_propostas",
+      "name": "Finalizar",
+      "method": "PATCH",
+      "url": "{{ _.base_url }}/propostas/1/finalizar",
+      "headers": []
+    },
+    {
+      "_id": "req_049",
+      "_type": "request",
+      "parentId": "fld_propostas",
+      "name": "Aceitar contraproposta",
+      "method": "PATCH",
+      "url": "{{ _.base_url }}/propostas/2/aceitar?usuarioId=1",
+      "headers": []
+    },
+    {
+      "_id": "req_050",
+      "_type": "request",
+      "parentId": "fld_propostas",
+      "name": "Recusar contraproposta em análise",
+      "method": "PATCH",
+      "url": "{{ _.base_url }}/propostas/2/recusar?usuarioId=1",
+      "headers": []
+    },
+    {
+      "_id": "req_051",
+      "_type": "request",
+      "parentId": "fld_propostas",
+      "name": "Desistir da negociação",
+      "method": "PATCH",
+      "url": "{{ _.base_url }}/propostas/2/desistir?usuarioId=2",
+      "headers": []
+    },
+    {
+      "_id": "fld_outros",
+      "_type": "request_group",
+      "parentId": "wrk_trokr",
+      "name": "Avaliações, Histórico e Logs"
+    },
+    {
+      "_id": "req_052",
+      "_type": "request",
+      "parentId": "fld_outros",
+      "name": "Avaliações recebidas por um usuário",
+      "method": "GET",
+      "url": "{{ _.base_url }}/avaliacoes?usuarioAlvoId=2",
+      "headers": []
+    },
+    {
+      "_id": "req_053",
+      "_type": "request",
+      "parentId": "fld_outros",
+      "name": "Erros nas últimas 24h",
+      "method": "GET",
+      "url": "{{ _.base_url }}/logs/nivel?nivel=ERROR&horas=24",
+      "headers": []
+    },
+    {
+      "_id": "req_054",
+      "_type": "request",
+      "parentId": "fld_outros",
+      "name": "Health",
+      "method": "GET",
+      "url": "{{ _.base_url }}/actuator/health",
+      "headers": []
+    }
+  ]
+}

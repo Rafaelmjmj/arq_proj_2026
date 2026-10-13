@@ -1,0 +1,309 @@
+@startuml
+' Diagrama de classes — Entrega 2 (Aulas 5 a 9)
+' Getters/setters omitidos para legibilidade: só atributos e métodos de negócio.
+
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+
+package "Domínio (Postgres / JPA)" {
+
+  class Usuario {
+    - id: Long
+    - nome: String
+    - email: String
+    - cidade: String
+    - saldoCreditos: Integer
+    - dataCriacao: LocalDateTime
+    --
+    + creditar(creditos: int): void
+    + mesmoUsuario(outro: Usuario): boolean
+  }
+
+  class Item {
+    - id: Long
+    - titulo: String
+    - descricao: String
+    - categoria: CategoriaItem
+    - usuarioProprietario: Usuario
+    - dataCriacao: LocalDateTime
+    --
+    + pertenceA(usuario: Usuario): boolean
+  }
+
+  enum CategoriaItem {
+    PRODUTO
+    SERVICO
+    EXPERIENCIA
+  }
+
+  class Proposta <<Contexto do State>> {
+    - id: Long
+    - titulo: String
+    - descricao: String
+    - status: Status
+    - usuario: Usuario
+    - itemOferecido: Item
+    - propostaPai: Proposta
+    - contrapropostas: List<Proposta>
+    - dataCriacao: LocalDateTime
+    - estadoRaiz: EstadoProposta <<transient>>
+    - estadoContra: EstadoContraproposta <<transient>>
+    --
+    + {static} criarContraProposta(descricao, autor, item, pai): Proposta
+    + mudarEstadoPara(novo: EstadoProposta): void
+    + mudarEstadoPara(novo: EstadoContraproposta): void
+    + submeter(): void
+    + aprovar(): void
+    + voltarParaRascunho(): void
+    + aceitar(quem: Usuario): void
+    + recusar(quem: Usuario): void
+    + desistirDaNegociacao(quem: Usuario): void
+    + cancelar(): void
+    + finalizar(): void
+    + isContraProposta(): boolean
+    + getRaiz(): Proposta
+    + isTrocaConcluida(): boolean
+    + getContrapropostaVencedora(): Optional<Proposta>
+  }
+
+  enum Status {
+    RASCUNHO
+    HOMOLOGACAO
+    ATIVA
+    NEGOCIADO_RAIZ
+    FINALIZADO
+    CANCELADO_RAIZ
+    EM_ANALISE
+    NEGOCIADO_CONTRA
+    FINALIZADO_CONTRA
+    RECUSADO
+    CANCELADO_CONTRA
+  }
+
+  class Avaliacao {
+    - id: Long
+    - nota: Integer
+    - descricao: String
+    - status: StatusAvaliacao
+    - proposta: Proposta
+    - usuarioAutor: Usuario
+    - usuarioAlvo: Usuario
+    - dataCriacao: LocalDateTime
+    - dataAvaliacao: LocalDateTime
+    --
+    + {static} pendente(proposta, autor, alvo): Avaliacao
+    + avaliar(quem: Usuario, nota: int, descricao: String): void
+  }
+
+  enum StatusAvaliacao {
+    PENDENTE
+    AVALIADA
+  }
+
+  class Historico {
+    - id: Long
+    - proposta: Proposta
+    - motivo: String
+    - statusAnterior: Status
+    - statusNovo: Status
+    - data: LocalDateTime
+    - usuario: Usuario
+  }
+}
+
+package "State — Opção A (duas interfaces)" {
+  interface EstadoProposta {
+    + irParaRascunho(p: Proposta)
+    + irParaHomologacao(p: Proposta)
+    + irParaAtiva(p: Proposta)
+    + irParaNegociado(p: Proposta)
+    + irParaFinalizado(p: Proposta)
+    + irParaCancelado(p: Proposta)
+    + isPodeMudar(): boolean
+    + getStatus(): Status
+    + podeReceberContraproposta(): boolean
+  }
+  class EstadoRascunho
+  class EstadoHomologacao
+  class EstadoAtiva
+  class EstadoNegociado
+  class EstadoFinalizado
+  class EstadoCancelado
+
+  interface EstadoContraproposta {
+    + irParaRascunho(p: Proposta)
+    + irParaEmAnalise(p: Proposta)
+    + irParaNegociado(p: Proposta)
+    + irParaFinalizado(p: Proposta)
+    + irParaRecusado(p: Proposta)
+    + irParaCancelado(p: Proposta)
+    + encerrarPorFimDaRaiz(p: Proposta)
+    + isPodeMudar(): boolean
+    + getStatus(): Status
+  }
+  class ContraRascunho
+  class ContraAnalise
+  class ContraNegociado
+  class ContraFinalizado
+  class ContraRecusado
+  class ContraCancelado
+
+  class FabricaDeEstados {
+    + {static} estadoRaiz(s: Status): EstadoProposta
+    + {static} estadoContraproposta(s: Status): EstadoContraproposta
+  }
+}
+
+package "Facade + Observer" {
+  class PropostaService <<Facade>> {
+    - propostaRepository: PropostaRepository
+    - usuarioService: UsuarioService
+    - itemService: ItemService
+    - eventPublisher: ApplicationEventPublisher
+    --
+    + criarProposta(...): Proposta
+    + criarContraproposta(...): Proposta
+    + submeter(id): Proposta
+    + aprovar(id): Proposta
+    + aceitar(id, usuarioId): Proposta
+    + recusar(id, usuarioId): Proposta
+    + desistirDaNegociacao(id, usuarioId): Proposta
+    + cancelar(id): Proposta
+    + finalizarNegociacao(id): Proposta
+    - construirEventoDeTrocaConcluida(p): TrocaConcluidaEvent
+  }
+
+  class PropostaController {
+    - propostaService: PropostaService
+  }
+
+  class TrocaConcluidaEvent <<record>> {
+    + propostaId: Long
+    + usuarioA: Usuario
+    + usuarioB: Usuario
+    + itemA: Item
+    + itemB: Item
+    + dataConclusao: LocalDateTime
+  }
+
+  class AtualizarAvaliacaoListener {
+    + aoConcluirTroca(e: TrocaConcluidaEvent)
+  }
+  class RegistrarHistoricoListener {
+    + aoConcluirTroca(e: TrocaConcluidaEvent)
+  }
+  class NotificarUsuariosListener {
+    + aoConcluirTroca(e: TrocaConcluidaEvent)
+  }
+  class RegistrarLogEventoListener {
+    + aoConcluirTroca(e: TrocaConcluidaEvent)
+  }
+  class AtribuirCreditosListener {
+    + aoConcluirTroca(e: TrocaConcluidaEvent)
+  }
+}
+
+package "Strategy" {
+  class CalculadoraCreditoService <<Contexto da Strategy>> {
+    - estrategias: Map<CategoriaItem, EstrategiaCredito>
+    --
+    + calcular(item: Item): int
+  }
+  interface EstrategiaCredito {
+    + categoria(): CategoriaItem
+    + calcular(item: Item): int
+  }
+  class CreditoProduto
+  class CreditoServico
+  class CreditoExperiencia
+}
+
+package "Adapter (MongoDB)" {
+  interface RegistroDeEventos <<porta>> {
+    + registrar(e: EventoRegistrado): EventoRegistrado
+    + buscarPorTipo(tipo: String): List<EventoRegistrado>
+    + buscarPorNivelDesde(nivel: NivelLog, desde: LocalDateTime): List<EventoRegistrado>
+  }
+  class RegistroDeEventosMongo <<adaptador>>
+  class LogEvento <<@Document>> {
+    - id: String
+    - tipo: String
+    - nivel: NivelLog
+    - origem: String
+    - mensagem: String
+    - payload: Map<String, Object>
+    - timestamp: LocalDateTime
+    - usuarioId: Long
+  }
+  interface LogEventoRepository <<MongoRepository>>
+  class LogEventoService {
+    + registrarInfo(...)
+    + registrarAviso(...)
+    + registrarErro(origem, mensagem, excecao)
+    + buscarPorTipo(tipo)
+  }
+  enum NivelLog {
+    INFO
+    WARN
+    ERROR
+  }
+}
+
+' ----- Relacionamentos do domínio -----
+Usuario "1" <-- "*" Item : usuarioProprietario
+Item --> CategoriaItem
+Usuario "1" <-- "*" Proposta : autor
+Item "1" <-- "*" Proposta : itemOferecido
+Proposta "0..1" <-- "*" Proposta : propostaPai (contraproposta)
+Proposta --> Status
+Proposta "1" <-- "*" Historico : gera
+Proposta "1" <-- "*" Avaliacao : recebe
+Usuario "1" <-- "*" Avaliacao : autor
+Usuario "1" <-- "*" Avaliacao : alvo
+Avaliacao --> StatusAvaliacao
+
+' ----- State -----
+Proposta o--> EstadoProposta : estado atual (raiz)
+Proposta o--> EstadoContraproposta : estado atual (contra)
+Proposta ..> FabricaDeEstados : reidrata o estado
+EstadoRascunho ..|> EstadoProposta
+EstadoHomologacao ..|> EstadoProposta
+EstadoAtiva ..|> EstadoProposta
+EstadoNegociado ..|> EstadoProposta
+EstadoFinalizado ..|> EstadoProposta
+EstadoCancelado ..|> EstadoProposta
+ContraRascunho ..|> EstadoContraproposta
+ContraAnalise ..|> EstadoContraproposta
+ContraNegociado ..|> EstadoContraproposta
+ContraFinalizado ..|> EstadoContraproposta
+ContraRecusado ..|> EstadoContraproposta
+ContraCancelado ..|> EstadoContraproposta
+
+' ----- Facade + Observer -----
+PropostaController --> PropostaService : 1 chamada
+PropostaService --> Proposta : delega transições
+PropostaService ..> TrocaConcluidaEvent : publica
+AtualizarAvaliacaoListener ..> TrocaConcluidaEvent : escuta
+RegistrarHistoricoListener ..> TrocaConcluidaEvent : escuta
+NotificarUsuariosListener ..> TrocaConcluidaEvent : escuta
+RegistrarLogEventoListener ..> TrocaConcluidaEvent : escuta
+AtribuirCreditosListener ..> TrocaConcluidaEvent : escuta
+AtualizarAvaliacaoListener ..> Avaliacao : cria 2 pendentes
+RegistrarHistoricoListener ..> Historico : cria
+
+' ----- Strategy -----
+AtribuirCreditosListener --> CalculadoraCreditoService : usa
+CalculadoraCreditoService o--> EstrategiaCredito : Map por categoria
+CreditoProduto ..|> EstrategiaCredito
+CreditoServico ..|> EstrategiaCredito
+CreditoExperiencia ..|> EstrategiaCredito
+
+' ----- Adapter -----
+RegistrarLogEventoListener --> LogEventoService : usa
+LogEventoService --> RegistroDeEventos : só conhece a porta
+RegistroDeEventosMongo ..|> RegistroDeEventos
+RegistroDeEventosMongo --> LogEventoRepository
+LogEventoRepository ..> LogEvento
+LogEvento --> NivelLog
+
+@enduml

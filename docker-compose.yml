@@ -1,0 +1,80 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: trokr-db
+    restart: unless-stopped
+    environment:
+      # Valores de exemplo para desenvolvimento local — nunca use senhas
+      # assim fora do ambiente local da disciplina.
+      POSTGRES_DB: trokr_db
+      POSTGRES_USER: trokr_user
+      POSTGRES_PASSWORD: changeme_local_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - trokr-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U trokr_user -d trokr_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Aula 8 — persistência poliglota: LogEvento vai para o MongoDB.
+  # Mesmo padrão do serviço do Postgres: imagem fixa, credenciais de dev,
+  # volume nomeado e healthcheck para a aplicação só subir com o banco pronto.
+  mongo:
+    image: mongo:8
+    container_name: trokr-mongo
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: trokr
+      MONGO_INITDB_ROOT_PASSWORD: trokr123
+    ports:
+      - "27017:27017"
+    volumes:
+      - trokr-mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    container_name: trokr-app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: trokr_db
+      DB_USER: trokr_user
+      DB_PASSWORD: changeme_local_dev
+      # "mongo" é o NOME DO SERVIÇO acima — é assim que containers se
+      # enxergam na mesma rede do Compose (não "localhost").
+      MONGO_HOST: mongo
+      MONGO_PORT: 27017
+      MONGO_DATABASE: trokr
+      MONGO_USERNAME: trokr
+      MONGO_PASSWORD: trokr123
+      MONGO_AUTH_DB: admin
+    ports:
+      - "8090:8080"
+    # Usado por `docker compose watch`: ao salvar um arquivo em src/ ou o
+    # pom.xml, o Compose reconstrói a imagem e recria o container sozinho,
+    # aproveitando o cache de camadas (as dependências já baixadas não são
+    # rebaixadas). Evita o ciclo manual de `down` + `up --build`.
+    develop:
+      watch:
+        - action: rebuild
+          path: ./src
+        - action: rebuild
+          path: ./pom.xml
+
+volumes:
+  trokr-db-data:
+  trokr-mongo-data:

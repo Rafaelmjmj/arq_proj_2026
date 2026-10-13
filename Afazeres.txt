@@ -1,0 +1,27 @@
+08/09 - Aula 5 - 6
+
+Fazer o controller, service e model, DTO de proposta e contraproposta.  
+Fazer um collection_postman para facilitar no request
+
+Utilizar o isPodeMudar no controller para fazer a verificação antes de entrar nos states "de fato". Caso for estado terminal o controller trata isso.
+
+Controller -> service -> repositorio-> DTO - De cima pra baixo
+
+Controller de proposta - Request Mapping(/propostas), lembrando que proposta e contra proposta são o mesmo model, fazer um auto relacionamento . Caso tenha é contra
+, caso não tenha é proposta
+
+15/09 - Aula 07
+
+Ajustar Diagrama para inserção do caso de contraproposta, de em_analise para rascunho.
+
+Fazer enum de Status Avaliação (Pendente, Avaliada)
+
+Criar entidade de avaliação (controller, DTO, Repository, service)
+
+Listeners do slide 
+
+Criar entidade Histórico (Slide 7/8) - Separar todas as arquiteturas em pastas
+
+Analisar tudo necessário para o funcionamento simples (Proposta, item, historico, etc etc)
+
+AUla dia 22/09 - Fazer alterações no que estão no slide no dockerfile e nos outros arquivos necesários.

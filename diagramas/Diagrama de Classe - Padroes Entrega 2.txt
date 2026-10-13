@@ -1,0 +1,84 @@
+@startuml
+' Visão focada nos padrões da Entrega 2: Facade, Observer, Strategy e Adapter.
+' O diagrama completo (domínio + State) está em "Diagrama de Classe.txt".
+skinparam classAttributeIconSize 0
+top to bottom direction
+
+class PropostaController {
+  - propostaService: PropostaService
+  + finalizar(id): PropostaResponseDTO
+}
+
+class PropostaService <<Facade>> {
+  - propostaRepository: PropostaRepository
+  - usuarioService: UsuarioService
+  - itemService: ItemService
+  - eventPublisher: ApplicationEventPublisher
+  + finalizarNegociacao(id): Proposta
+  - construirEventoDeTrocaConcluida(p): TrocaConcluidaEvent
+}
+
+class Proposta <<Contexto do State>> {
+  + finalizar(): void
+  + isTrocaConcluida(): boolean
+}
+
+class TrocaConcluidaEvent <<record>> {
+  + propostaId: Long
+  + usuarioA: Usuario
+  + usuarioB: Usuario
+  + itemA: Item
+  + itemB: Item
+  + dataConclusao: LocalDateTime
+}
+
+class AtualizarAvaliacaoListener
+class RegistrarHistoricoListener
+class NotificarUsuariosListener
+class RegistrarLogEventoListener
+class AtribuirCreditosListener
+
+class CalculadoraCreditoService <<Contexto da Strategy>> {
+  - estrategias: Map<CategoriaItem, EstrategiaCredito>
+  + calcular(item: Item): int
+}
+interface EstrategiaCredito {
+  + categoria(): CategoriaItem
+  + calcular(item: Item): int
+}
+class CreditoProduto
+class CreditoServico
+class CreditoExperiencia
+
+class LogEventoService
+interface RegistroDeEventos <<porta>> {
+  + registrar(e: EventoRegistrado): EventoRegistrado
+  + buscarPorTipo(tipo): List<EventoRegistrado>
+}
+class RegistroDeEventosMongo <<adaptador>>
+interface LogEventoRepository <<MongoRepository>>
+class LogEvento <<@Document>>
+
+PropostaController --> PropostaService : 1 chamada
+PropostaService --> Proposta : 1. transição (State)
+PropostaService ..> TrocaConcluidaEvent : 2. publica (Observer)
+
+AtualizarAvaliacaoListener ..> TrocaConcluidaEvent : escuta
+RegistrarHistoricoListener ..> TrocaConcluidaEvent : escuta
+NotificarUsuariosListener ..> TrocaConcluidaEvent : escuta
+RegistrarLogEventoListener ..> TrocaConcluidaEvent : escuta
+AtribuirCreditosListener ..> TrocaConcluidaEvent : escuta
+
+AtribuirCreditosListener --> CalculadoraCreditoService
+CalculadoraCreditoService o--> EstrategiaCredito
+CreditoProduto ..|> EstrategiaCredito
+CreditoServico ..|> EstrategiaCredito
+CreditoExperiencia ..|> EstrategiaCredito
+
+RegistrarLogEventoListener --> LogEventoService
+LogEventoService --> RegistroDeEventos
+RegistroDeEventosMongo ..|> RegistroDeEventos
+RegistroDeEventosMongo --> LogEventoRepository
+LogEventoRepository ..> LogEvento
+
+@enduml

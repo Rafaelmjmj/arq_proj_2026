@@ -1,0 +1,95 @@
+@startuml
+
+actor "Usuário A" as UA
+participant "Proposta" as P
+participant "Histórico" as H
+actor "Usuário B" as UB
+participant "Avaliação" as A
+
+== Fase 1: Criar Proposta ==
+UA -> P: 1: new Proposta()
+activate P
+P -> H: 2: registrarCriacao()
+activate H
+H --> P: status: RASCUNHO
+deactivate H
+deactivate P
+
+== Fase 2: Submeter para Homologação ==
+UA -> P: 3: submeterProposta()
+activate P
+P -> H: 4: registrarMudança(Status.RASCUNHO → HOMOLOGACAO)
+activate H
+H --> P: status: HOMOLOGAÇÃO
+deactivate H
+deactivate P
+
+== Fase 3: Aprovar Proposta ==
+P -> H: 5: aprovarProposta()
+activate P
+activate H
+H --> P: status: ATIVA
+deactivate H
+deactivate P
+
+== Fase 4: Contraproposta ==
+UA -> P: 6: criarContraproposta()
+activate P
+P -> UB: 7: notificarContraproposta()
+P -> H: 8: registrarMudança(Status.ATIVA → EM_ANALISE)
+activate H
+H --> P: status: EM_ANÁLISE
+deactivate H
+deactivate P
+
+== Fase 5: Análise da Contraproposta ==
+alt Contraproposta recusada
+	UB -> P: 9a: recusarContraproposta(motivo)
+	activate P
+	P -> H: 10a: registrarMudança(Status.EM_ANALISE → ATIVA, motivo)
+	activate H
+	H --> P: status: ATIVA
+	deactivate H
+	P -> UA: 11a: notificarRecusa()
+	deactivate P
+	note right of UB: Volta para ATIVA\nPode fazer nova contraproposta
+
+else Concordam com a contraproposta
+	UB -> P: 9b: concordarComContraproposta()
+	activate P
+	P -> H: 10b: registrarMudança(Status.EM_ANALISE → NEGOCIADO)
+	activate H
+	H --> P: status: NEGOCIADO
+	deactivate H
+	deactivate P
+
+	== Fase 6: Finalizar Troca ==
+	UA -> P: 11b: finalizarProposta()
+	activate P
+	P -> H: 12b: registrarMudança(Status.NEGOCIADO → FINALIZADO)
+	activate H
+	H --> P: status: FINALIZADO
+	deactivate H
+	deactivate P
+
+	== Fase 7: Avaliar ==
+	UA -> A: 13b: criarAvaliacao(nota, comentário)
+	activate A
+	A -> UB: 14b: salvar()
+	deactivate A
+
+else Não chegam em acordo - Cancelam negociação
+	UB -> P: 9c: cancelarNegociacao(motivo)
+	activate P
+	P -> H: 10c: registrarMudança(Status.EM_ANALISE → CANCELADO, motivo)
+	activate H
+	H --> P: status: CANCELADO
+	deactivate H
+	deactivate P
+
+	P -> UA: 11c: notificarCancelamento()
+	P -> UB: 12c: confirmacaoCancelamento()
+
+end
+
+@enduml
