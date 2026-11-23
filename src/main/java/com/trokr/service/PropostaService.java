@@ -1,7 +1,8 @@
 package com.trokr.service;
 
+import com.trokr.config.AtrasoDemo;
 import com.trokr.event.TrocaConcluidaEvent;
-import com.trokr.exception.ResourceNotFoundException;
+import com.trokr.exception.RecursoNaoEncontradoException;
 import com.trokr.model.Item;
 import com.trokr.model.Proposta;
 import com.trokr.model.Usuario;
@@ -29,9 +30,16 @@ import org.springframework.transaction.annotation.Transactional;
  *   <li>se a troca chegou ao estado final, publica
  *       {@link TrocaConcluidaEvent} (Observer);</li>
  *   <li>os cinco listeners reagem sem que esta classe saiba que existem:
- *       Avaliação, Histórico, Notificação, LogEvento (Adapter → Mongo) e
- *       Créditos (Strategy).</li>
+ *       Avaliação, Histórico e Créditos (Strategy) DENTRO da transação;
+ *       LogEvento (Adapter → Mongo) e Notificação só DEPOIS do commit
+ *       (Aula 10, Corrida 3).</li>
  * </ol>
+ *
+ * <p>Concorrência (Aula 10): o {@code @Transactional} garante atomicidade,
+ * não exclusividade. Quem impede a mesma troca de ser finalizada duas vezes é
+ * o {@code @Version} da Proposta (lock otimista); o crédito usa um UPDATE
+ * atômico. Esta classe não precisou mudar por causa disso — só ganhou o
+ * ponto onde o atraso de demonstração abre a janela da corrida.
  *
  * <p>O que ela deliberadamente NÃO faz:
  * <ul>
@@ -41,7 +49,7 @@ import org.springframework.transaction.annotation.Transactional;
  *       listeners e da Strategy.</li>
  * </ul>
  * Ela só sabe EM QUE ORDEM as coisas acontecem, não COMO cada uma é feita.
- * Por isso tem só 4 dependências e nenhum if de regra de negócio.
+ * Por isso tem poucas dependências e nenhum if de regra de negócio.
  */
 @Service
 @RequiredArgsConstructor
@@ -51,6 +59,7 @@ public class PropostaService {
     private final UsuarioService usuarioService;
     private final ItemService itemService;
     private final ApplicationEventPublisher eventPublisher;
+    private final AtrasoDemo atrasoDemo;
 
     // =====================================================================
     // Consultas
@@ -70,7 +79,7 @@ public class PropostaService {
 
     public Proposta buscarPorId(Long id) {
         return propostaRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Proposta não encontrada com id " + id));
+                .orElseThrow(() -> RecursoNaoEncontradoException.proposta(id));
     }
 
     /** As contrapropostas (concorrentes) de uma proposta raiz. */
@@ -160,6 +169,10 @@ public class PropostaService {
     public Proposta finalizarNegociacao(Long id) {
         Proposta proposta = buscarPorId(id);
         proposta.finalizar();
+        // Aula 10: a janela entre "o estado conferiu" e "gravei". Com
+        // trokr.demo.atraso-ms = 2000, duas finalizações simultâneas se cruzam
+        // aqui; o @Version faz a segunda falhar no commit (409).
+        atrasoDemo.aplicar();
         propostaRepository.save(proposta);
 
         if (proposta.isTrocaConcluida()) {
@@ -176,6 +189,7 @@ public class PropostaService {
     private TrocaConcluidaEvent construirEventoDeTrocaConcluida(Proposta proposta) {
         Proposta raiz = proposta.getRaiz();
         Proposta vencedora = raiz.getContrapropostaVencedora()
+                // Defeito: o domínio garante a vencedora numa troca concluída → 500.
                 .orElseThrow(() -> new IllegalStateException("Troca concluída sem contraproposta vencedora"));
 
         return new TrocaConcluidaEvent(

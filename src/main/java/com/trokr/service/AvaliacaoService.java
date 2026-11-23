@@ -1,6 +1,6 @@
 package com.trokr.service;
 
-import com.trokr.exception.ResourceNotFoundException;
+import com.trokr.exception.RecursoNaoEncontradoException;
 import com.trokr.model.Avaliacao;
 import com.trokr.model.Usuario;
 import com.trokr.repository.AvaliacaoRepository;
@@ -36,7 +36,7 @@ public class AvaliacaoService {
 
     public Avaliacao buscarPorId(Long id) {
         return avaliacaoRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Avaliação não encontrada com id " + id));
+                .orElseThrow(() -> RecursoNaoEncontradoException.avaliacao(id));
     }
 
     @Transactional

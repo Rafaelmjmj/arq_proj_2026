@@ -8,6 +8,8 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.trokr.exception.AcessoNegadoException;
+import com.trokr.exception.RegraNegocioException;
+import com.trokr.exception.TransicaoInvalidaException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -42,7 +44,7 @@ class AvaliacaoTest {
     @Test
     void naoAvaliaDuasVezes() {
         anaAvaliaBruno.avaliar(ana, 5, "Ótimo");
-        assertThrows(IllegalStateException.class, () -> anaAvaliaBruno.avaliar(ana, 1, "Mudei de ideia"));
+        assertThrows(TransicaoInvalidaException.class, () -> anaAvaliaBruno.avaliar(ana, 1, "Mudei de ideia"));
         assertEquals(5, anaAvaliaBruno.getNota());
     }
 
@@ -54,7 +56,7 @@ class AvaliacaoTest {
 
     @Test
     void notaForaDaFaixa() {
-        assertThrows(IllegalArgumentException.class, () -> anaAvaliaBruno.avaliar(ana, 6, "?"));
-        assertThrows(IllegalArgumentException.class, () -> anaAvaliaBruno.avaliar(ana, 0, "?"));
+        assertThrows(RegraNegocioException.class, () -> anaAvaliaBruno.avaliar(ana, 6, "?"));
+        assertThrows(RegraNegocioException.class, () -> anaAvaliaBruno.avaliar(ana, 0, "?"));
     }
 }

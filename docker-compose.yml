@@ -62,6 +62,13 @@ services:
       MONGO_USERNAME: trokr
       MONGO_PASSWORD: trokr123
       MONGO_AUTH_DB: admin
+      # Aula 10/11/13 — valores de demonstração, sobrescrevíveis na linha de
+      # comando: TROKR_ATRASO_MS=2000 docker compose up
+      TROKR_ATRASO_MS: ${TROKR_ATRASO_MS:-0}
+      # 0.0 desde a Aula 13: quem derruba a notificação é o interruptor
+      # PATCH /demo/notificacao/fora-do-ar.
+      TROKR_TAXA_FALHA: ${TROKR_TAXA_FALHA:-0.0}
+      TROKR_DEMO_ENDPOINTS: ${TROKR_DEMO_ENDPOINTS:-true}
     ports:
       - "8090:8080"
     # Usado por `docker compose watch`: ao salvar um arquivo em src/ ou o

@@ -12,10 +12,21 @@ public final class Fixtures {
         return usuario;
     }
 
+    /**
+     * Aula 12 — Item é abstrato: cada categoria tem a sua subclasse, montada
+     * pelo builder. Num fixture de teste o switch é aceitável; no código de
+     * produção quem escolhe a subclasse é o CatalogoDeFabricas.
+     */
     public static Item item(long id, String titulo, CategoriaItem categoria, Usuario dono) {
-        Item item = new Item(titulo, "descrição de " + titulo, categoria, dono);
-        item.setId(id);
-        return item;
+        String descricao = "descrição de " + titulo;
+        return switch (categoria) {
+            case PRODUTO -> ItemProduto.builder().id(id).titulo(titulo).descricao(descricao)
+                    .usuarioProprietario(dono).pesoGramas(500).build();
+            case SERVICO -> ItemServico.builder().id(id).titulo(titulo).descricao(descricao)
+                    .usuarioProprietario(dono).duracaoMinutos(60).build();
+            case EXPERIENCIA -> ItemExperiencia.builder().id(id).titulo(titulo).descricao(descricao)
+                    .usuarioProprietario(dono).nivel(NivelExperiencia.INICIANTE).build();
+        };
     }
 
     /** Proposta raiz já levada até Ativa (Rascunho → Homologação → Ativa). */

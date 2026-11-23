@@ -1,5 +1,6 @@
 package com.trokr.model.state.contraproposta;
 
+import com.trokr.exception.TransicaoInvalidaException;
 import com.trokr.model.Proposta;
 import com.trokr.model.Status;
 
@@ -12,32 +13,32 @@ public class ContraRecusado implements EstadoContraproposta {
 
     @Override
     public void irParaRascunho(Proposta contraproposta) {
-        throw new IllegalStateException(TRANSICAO_INVALIDA + "Rascunho");
+        throw TransicaoInvalidaException.daContraproposta(TRANSICAO_INVALIDA + "Rascunho");
     }
 
     @Override
     public void irParaEmAnalise(Proposta contraproposta) {
-        throw new IllegalStateException(TRANSICAO_INVALIDA + "Em Análise");
+        throw TransicaoInvalidaException.daContraproposta(TRANSICAO_INVALIDA + "Em Análise");
     }
 
     @Override
     public void irParaNegociado(Proposta contraproposta) {
-        throw new IllegalStateException(TRANSICAO_INVALIDA + "Negociado");
+        throw TransicaoInvalidaException.daContraproposta(TRANSICAO_INVALIDA + "Negociado");
     }
 
     @Override
     public void irParaFinalizado(Proposta contraproposta) {
-        throw new IllegalStateException(TRANSICAO_INVALIDA + "Finalizado");
+        throw TransicaoInvalidaException.daContraproposta(TRANSICAO_INVALIDA + "Finalizado");
     }
 
     @Override
     public void irParaRecusado(Proposta contraproposta) {
-        throw new IllegalStateException("A contraproposta já está como Recusado. Transição inválida!");
+        throw TransicaoInvalidaException.daContraproposta("A contraproposta já está como Recusado. Transição inválida!");
     }
 
     @Override
     public void irParaCancelado(Proposta contraproposta) {
-        throw new IllegalStateException(TRANSICAO_INVALIDA + "Cancelado");
+        throw TransicaoInvalidaException.daContraproposta(TRANSICAO_INVALIDA + "Cancelado");
     }
 
     /** Efeito cascata. Terminal: nada muda. */

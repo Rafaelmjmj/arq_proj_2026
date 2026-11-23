@@ -9,7 +9,7 @@
       "_type": "workspace",
       "parentId": null,
       "name": "Trokr API",
-      "description": "Entrega 2 — State, Observer, Adapter, Strategy e Facade"
+      "description": "Entrega 2 + Entrega Final (Aulas 10 e 11)"
     },
     {
       "_id": "env_base",
@@ -95,7 +95,7 @@
       ],
       "body": {
         "mimeType": "application/json",
-        "text": "{\n  \"titulo\": \"Bicicleta\",\n  \"descricao\": \"Aro 29, pouco uso\",\n  \"categoria\": \"PRODUTO\",\n  \"usuarioId\": 1\n}"
+        "text": "{\n  \"titulo\": \"Bicicleta\",\n  \"descricao\": \"Aro 29, pouco uso\",\n  \"categoria\": \"PRODUTO\",\n  \"pesoGramas\": 12000,\n  \"usuarioId\": 1\n}"
       }
     },
     {
@@ -113,7 +113,7 @@
       ],
       "body": {
         "mimeType": "application/json",
-        "text": "{\n  \"titulo\": \"Aula de violão\",\n  \"descricao\": \"1 hora, iniciantes\",\n  \"categoria\": \"SERVICO\",\n  \"usuarioId\": 2\n}"
+        "text": "{\n  \"titulo\": \"Aula de violão\",\n  \"descricao\": \"1 hora, iniciantes\",\n  \"categoria\": \"SERVICO\",\n  \"duracaoMinutos\": 60,\n  \"usuarioId\": 2\n}"
       }
     },
     {
@@ -131,7 +131,7 @@
       ],
       "body": {
         "mimeType": "application/json",
-        "text": "{\n  \"titulo\": \"Passeio guiado\",\n  \"descricao\": \"Trilha no Salto de Itiquira\",\n  \"categoria\": \"EXPERIENCIA\",\n  \"usuarioId\": 3\n}"
+        "text": "{\n  \"titulo\": \"Passeio guiado\",\n  \"descricao\": \"Trilha no Salto de Itiquira\",\n  \"categoria\": \"EXPERIENCIA\",\n  \"nivel\": \"INTERMEDIARIO\",\n  \"usuarioId\": 3\n}"
       }
     },
     {
@@ -503,7 +503,7 @@
       ],
       "body": {
         "mimeType": "application/json",
-        "text": "{\n  \"titulo\": \"Bicicleta\",\n  \"descricao\": \"Aro 29\",\n  \"categoria\": \"PRODUTO\",\n  \"usuarioId\": 1\n}"
+        "text": "{\n  \"titulo\": \"Bicicleta\",\n  \"descricao\": \"Aro 29\",\n  \"categoria\": \"PRODUTO\",\n  \"pesoGramas\": 11500,\n  \"usuarioId\": 1\n}"
       }
     },
     {
@@ -651,6 +651,312 @@
       "name": "Health",
       "method": "GET",
       "url": "{{ _.base_url }}/actuator/health",
+      "headers": []
+    },
+    {
+      "_id": "fld_aula11",
+      "_type": "request_group",
+      "parentId": "wrk_trokr",
+      "name": "Aula 11 · requisições erradas (contrato de erro)"
+    },
+    {
+      "_id": "req_901",
+      "_type": "request",
+      "parentId": "fld_aula11",
+      "name": "1 · 404 USUARIO_NAO_ENCONTRADO",
+      "method": "GET",
+      "url": "{{ _.base_url }}/usuarios/999",
+      "headers": []
+    },
+    {
+      "_id": "req_902",
+      "_type": "request",
+      "parentId": "fld_aula11",
+      "name": "2 · 409 PROPOSTA_TRANSICAO_INVALIDA (aprovar fora da Homologação)",
+      "method": "PATCH",
+      "url": "{{ _.base_url }}/propostas/1/aprovar",
+      "headers": []
+    },
+    {
+      "_id": "req_903",
+      "_type": "request",
+      "parentId": "fld_aula11",
+      "name": "3 · 400 VALIDACAO com campos",
+      "method": "POST",
+      "url": "{{ _.base_url }}/usuarios",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"nome\": \"\",\n  \"email\": \"\",\n  \"cidade\": \"Formosa\"\n}"
+      }
+    },
+    {
+      "_id": "req_904",
+      "_type": "request",
+      "parentId": "fld_aula11",
+      "name": "4 · 400 JSON quebrado (ProblemDetail do Spring)",
+      "method": "POST",
+      "url": "{{ _.base_url }}/itens",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\"titulo\": \"Bicicleta\", \"descricao\": \"Aro 29\" \"categoria\": \"PRODUTO\"}"
+      }
+    },
+    {
+      "_id": "req_905",
+      "_type": "request",
+      "parentId": "fld_aula11",
+      "name": "5 · 400 id não numérico (ProblemDetail do Spring)",
+      "method": "GET",
+      "url": "{{ _.base_url }}/usuarios/abc",
+      "headers": []
+    },
+    {
+      "_id": "req_906",
+      "_type": "request",
+      "parentId": "fld_aula11",
+      "name": "6 · 422 ITEM_DE_OUTRO_USUARIO",
+      "method": "POST",
+      "url": "{{ _.base_url }}/propostas",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"titulo\": \"Troco o item de outra pessoa\",\n  \"descricao\": \"teste\",\n  \"usuarioId\": 1,\n  \"itemId\": 2\n}"
+      }
+    },
+    {
+      "_id": "req_907",
+      "_type": "request",
+      "parentId": "fld_aula11",
+      "name": "7 · 500 ERRO_INTERNO com ocorrencia",
+      "method": "GET",
+      "url": "{{ _.base_url }}/demo/erro-inesperado",
+      "headers": []
+    },
+    {
+      "_id": "req_908",
+      "_type": "request",
+      "parentId": "fld_aula11",
+      "name": "7b · Conferir a ocorrencia em GET /logs",
+      "method": "GET",
+      "url": "{{ _.base_url }}/logs?tipo=ERRO_SISTEMA",
+      "headers": []
+    },
+    {
+      "_id": "fld_aula12",
+      "_type": "request_group",
+      "parentId": "wrk_trokr",
+      "name": "Aula 12 · Factory e Builder (criar itens por tipo)",
+      "description": "Rodar depois do roteiro (usuários 1–3 existem). As fábricas recusam com 422 o item que não pode existir."
+    },
+    {
+      "_id": "req_951",
+      "_type": "request",
+      "parentId": "fld_aula12",
+      "name": "1 · 201 PRODUTO com peso (FabricaItemProduto)",
+      "method": "POST",
+      "url": "{{ _.base_url }}/itens",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"titulo\": \"Violão\",\n  \"descricao\": \"Cordas novas\",\n  \"categoria\": \"PRODUTO\",\n  \"pesoGramas\": 2500,\n  \"usuarioId\": 1\n}"
+      }
+    },
+    {
+      "_id": "req_952",
+      "_type": "request",
+      "parentId": "fld_aula12",
+      "name": "2 · 201 EXPERIENCIA com nível (FabricaItemExperiencia)",
+      "method": "POST",
+      "url": "{{ _.base_url }}/itens",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"titulo\": \"Aula de escalada\",\n  \"descricao\": \"Muro indoor\",\n  \"categoria\": \"EXPERIENCIA\",\n  \"nivel\": \"INICIANTE\",\n  \"usuarioId\": 2\n}"
+      }
+    },
+    {
+      "_id": "req_953",
+      "_type": "request",
+      "parentId": "fld_aula12",
+      "name": "3 · 422 ITEM_DADOS_INCOMPLETOS (produto sem peso)",
+      "method": "POST",
+      "url": "{{ _.base_url }}/itens",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"titulo\": \"Livro\",\n  \"descricao\": \"Sem peso informado\",\n  \"categoria\": \"PRODUTO\",\n  \"usuarioId\": 1\n}"
+      }
+    },
+    {
+      "_id": "req_954",
+      "_type": "request",
+      "parentId": "fld_aula12",
+      "name": "4 · 422 ITEM_CAMPO_INCOMPATIVEL (serviço com peso)",
+      "method": "POST",
+      "url": "{{ _.base_url }}/itens",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"titulo\": \"Conserto\",\n  \"descricao\": \"Serviço não tem peso\",\n  \"categoria\": \"SERVICO\",\n  \"duracaoMinutos\": 30,\n  \"pesoGramas\": 200,\n  \"usuarioId\": 2\n}"
+      }
+    },
+    {
+      "_id": "req_955",
+      "_type": "request",
+      "parentId": "fld_aula12",
+      "name": "5 · 422 ITEM_CATEGORIA_IMUTAVEL (produto 1 virar serviço)",
+      "method": "PUT",
+      "url": "{{ _.base_url }}/itens/1",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"titulo\": \"Bicicleta\",\n  \"descricao\": \"Agora é serviço?\",\n  \"categoria\": \"SERVICO\",\n  \"duracaoMinutos\": 60,\n  \"usuarioId\": 1\n}"
+      }
+    },
+    {
+      "_id": "req_956",
+      "_type": "request",
+      "parentId": "fld_aula12",
+      "name": "6 · 400 VALIDACAO (peso negativo)",
+      "method": "POST",
+      "url": "{{ _.base_url }}/itens",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"titulo\": \"Caixa\",\n  \"descricao\": \"Peso inválido\",\n  \"categoria\": \"PRODUTO\",\n  \"pesoGramas\": -5,\n  \"usuarioId\": 1\n}"
+      }
+    },
+    {
+      "_id": "fld_aula13",
+      "_type": "request_group",
+      "parentId": "wrk_trokr",
+      "name": "Aula 13 · Notificação fora do ar (retry e disjuntor)",
+      "description": "Rode o preparar-cenario.sh antes: ele deixa duas negociações prontas. Derrube o serviço, finalize as duas e confira as 3 NOTIFICACAO_PENDENTE."
+    },
+    {
+      "_id": "req_961",
+      "_type": "request",
+      "parentId": "fld_aula13",
+      "name": "1 · Derrubar o serviço de notificação",
+      "method": "PATCH",
+      "url": "{{ _.base_url }}/demo/notificacao/fora-do-ar",
+      "headers": []
+    },
+    {
+      "_id": "req_962",
+      "_type": "request",
+      "parentId": "fld_aula13",
+      "name": "2 · Finalizar a Raiz 1 (troque o id): A falha 3x, B abre o disjuntor",
+      "method": "PATCH",
+      "url": "{{ _.base_url }}/propostas/1/finalizar",
+      "headers": []
+    },
+    {
+      "_id": "req_963",
+      "_type": "request",
+      "parentId": "fld_aula13",
+      "name": "3 · Finalizar a Raiz 2 (troque o id): rápido, duas pendentes na hora",
+      "method": "PATCH",
+      "url": "{{ _.base_url }}/propostas/2/finalizar",
+      "headers": []
+    },
+    {
+      "_id": "req_964",
+      "_type": "request",
+      "parentId": "fld_aula13",
+      "name": "4 · Conferir 3 NOTIFICACAO_PENDENTE",
+      "method": "GET",
+      "url": "{{ _.base_url }}/logs?tipo=NOTIFICACAO_PENDENTE",
+      "headers": []
+    },
+    {
+      "_id": "req_965",
+      "_type": "request",
+      "parentId": "fld_aula13",
+      "name": "5 · Conferir falhas definitivas (ERRO_SISTEMA)",
+      "method": "GET",
+      "url": "{{ _.base_url }}/logs?tipo=ERRO_SISTEMA",
+      "headers": []
+    },
+    {
+      "_id": "req_966",
+      "_type": "request",
+      "parentId": "fld_aula13",
+      "name": "6 · Religar o serviço (espere 30 s e finalize outra troca)",
+      "method": "PATCH",
+      "url": "{{ _.base_url }}/demo/notificacao/no-ar",
+      "headers": []
+    },
+    {
+      "_id": "fld_aula14",
+      "_type": "request_group",
+      "parentId": "wrk_trokr",
+      "name": "Aula 14 · Contrato OpenAPI",
+      "description": "A tela fica em http://localhost:8090/swagger-ui.html. O JSON abaixo pode ser importado no Insomnia/Postman para gerar uma coleção agrupada pelas tags."
+    },
+    {
+      "_id": "req_971",
+      "_type": "request",
+      "parentId": "fld_aula14",
+      "name": "1 · Contrato em JSON",
+      "method": "GET",
+      "url": "{{ _.base_url }}/v3/api-docs",
+      "headers": []
+    },
+    {
+      "_id": "req_972",
+      "_type": "request",
+      "parentId": "fld_aula14",
+      "name": "2 · Contrato em YAML",
+      "method": "GET",
+      "url": "{{ _.base_url }}/v3/api-docs.yaml",
       "headers": []
     }
   ]

@@ -36,9 +36,363 @@ falhar. Ao fim, `GET /usuarios` mostra A = 10 e B = 15 créditos, e existem
 
 ### Testes unitários
 
-`./mvnw test -Dtest='PropostaStateTest,AvaliacaoTest,Credito*Test,CalculadoraCreditoServiceTest'`
-roda os testes de domínio, State e Strategy sem precisar de banco. O
+`./mvnw test -Dtest='PropostaStateTest,AvaliacaoTest,Credito*Test,CalculadoraCreditoServiceTest,FabricasDeItemTest,CatalogoDeFabricasTest,NotificarUsuariosListenerTest,Notificacao*Test,PilhaDeNotificacaoTest,AtrasoDemoTest'`
+roda os testes de domínio, State, Strategy, das fábricas de item, das camadas de notificação (retry e disjuntor) da notificação e do
+atraso de demonstração sem precisar de banco. O
 `TrokrApplicationTests` continua exigindo Postgres e Mongo no ar.
+
+## Entrega Final — Aula 10: concorrência
+
+Três condições de corrida, uma ferramenta para cada.
+
+| Corrida | O que acontecia | Causa | Ferramenta | Onde |
+|---|---|---|---|---|
+| 1 · a mesma troca finalizada duas vezes (`./corrida.sh <raiz>`) | 200 e 200, duas avaliações por lado, crédito em dobro | check-then-act: as duas requisições conferiram o estado "Negociado" antes de qualquer uma gravar | **Lock otimista**: `@Version` na Proposta. A segunda grava com versão velha, afeta 0 linhas, a transação inteira é desfeita e o cliente recebe **409** `PROPOSTA_ALTERADA_CONCORRENTEMENTE` | `Proposta.versao`, `GlobalExceptionHandler.handleConcorrencia` |
+| 2 · duas trocas do mesmo usuário (`./corrida.sh <raiz1> <raiz2>`) | 200 e 200, mas o saldo de A perdia uma das somas (30 + 10 + 15 = 45) | read-modify-write: o listener lia o saldo, somava no Java e gravava | **UPDATE atômico**: `adicionarCreditos` soma no próprio banco; o segundo UPDATE espera o lock da linha e soma sobre o valor já commitado | `UsuarioRepository.adicionarCreditos`, `AtribuirCreditosListener` |
+| 3 · o efeito fantasma | Com a Corrida 1 resolvida, o Postgres desfazia a segunda finalização, mas o log no Mongo e a notificação já tinham saído | o rollback só alcança a transação do Postgres; Mongo e mensagens ficam fora dela | **Evento depois do commit**: `@TransactionalEventListener(AFTER_COMMIT)` no log e na notificação | `RegistrarLogEventoListener`, `NotificarUsuariosListener` |
+
+Por que cada ferramenta:
+
+- **Corrida 1, lock otimista e não pessimista.** A regra "só finaliza se o
+  estado permitir" mora no State, não cabe num WHERE. O conflito é raro, e
+  quem perde deve ser avisado (a troca já acabou), não esperar numa fila. O
+  pessimista travaria toda finalização e arriscaria deadlock com a cascata.
+  Não há retry automático: repetir leria a Proposta já Finalizada e o State
+  recusaria do mesmo jeito. De brinde, o `@Version` também protege aceitar
+  duas contrapropostas em abas diferentes e a cascata x o autor enviando.
+- **Corrida 2, UPDATE atômico e não `@Version` no Usuario.** "Somar ao
+  saldo" é aritmética pura: cabe num SQL. Com `@Version`, uma troca correta
+  receberia 409 por causa de OUTRA troca. Aqui as duas estão certas e as duas
+  dão 200. Cuidados tomados: depois do UPDATE, ninguém salva o mesmo Usuario
+  na transação (o objeto Java ficou com o saldo antigo); e os dois créditos
+  são aplicados sempre em ordem crescente de id, para que as trocas A↔B e
+  B↔A ao mesmo tempo não travem uma à outra (deadlock).
+- **Corrida 3, o que fica dentro e o que espera.** Avaliação, Histórico e
+  Créditos gravam no Postgres e continuam DENTRO da transação: se ela for
+  desfeita, eles somem junto. Log (Mongo) e notificação (fora do sistema)
+  esperam o commit. Bônus: `RegistrarFinalizacaoRecusadaListener`
+  (`AFTER_ROLLBACK`) registra `FINALIZACAO_RECUSADA` no LogEvento quando uma
+  finalização é desfeita.
+
+O atraso de demonstração fica em `config/AtrasoDemo` (modelo da aula), lido
+de `trokr.demo.atraso-ms`; é aplicado em `finalizarNegociacao()`, entre o
+estado conferir e a Proposta ser gravada.
+
+**Como reproduzir** (no Windows, os scripts rodam no Git Bash):
+
+1. Suba com o atraso ligado: `TROKR_ATRASO_MS=2000 docker compose up --build`
+   (no PowerShell: `$env:TROKR_ATRASO_MS=2000; docker compose up --build`).
+2. `./preparar-cenario.sh` cria três usuários e duas negociações em Negociado
+   com o usuário A em comum, e imprime os comandos prontos.
+3. `./corrida.sh <raiz1>` deve dar **200 e 409**, com duas avaliações, um
+   histórico, crédito uma vez só, um `TROCA_CONCLUIDA` em `GET /logs` e duas
+   notificações.
+4. Rode `./preparar-cenario.sh` de novo e então `./corrida.sh <raiz1> <raiz2>`:
+   deve dar **200 e 200**, com o saldo de A igual a 20 (10 + 10).
+5. Entregue com o atraso em 0 (é o padrão).
+
+Limite conhecido: o `@Version` protege o intervalo dentro de uma requisição.
+Se A abre a tela, pensa cinco minutos e B altera a proposta nesse meio-tempo,
+a versão teria de ir até o cliente e voltar (ETag/If-Match), o que está fora
+do escopo da disciplina.
+
+## Entrega Final — Aula 11: contrato de erro
+
+Toda resposta de erro é um **ProblemDetail** (RFC 9457,
+`application/problem+json`), atendendo três leitores: o código do cliente
+(`status` + `codigo` estável), a pessoa na tela (`title` fixo + `detail`
+desta ocorrência) e quem opera (`instance` e, no 500, `ocorrencia`).
+
+```json
+{
+  "type": "https://trokr.local/erros/proposta-transicao-invalida",
+  "title": "Ação não permitida no estado atual",
+  "status": 409,
+  "detail": "Transição inválida: Rascunho → Ativa",
+  "instance": "/propostas/1/aprovar",
+  "codigo": "PROPOSTA_TRANSICAO_INVALIDA",
+  "timestamp": "2026-10-27T10:42:10Z"
+}
+```
+
+### Hierarquia de exceções
+
+Exceções de domínio (a regra disse "não") herdam de `TrokrException`, que é
+`sealed`, unchecked e carrega o `codigo`. Elas não conhecem HTTP (Opção B): o
+`GlobalExceptionHandler` faz o mapeamento, porque na Aula 12 as mesmas
+exceções aparecem num agendamento, sem requisição nenhuma. Falhas técnicas
+(NullPointerException, Mongo fora do ar, notificação indisponível) ficam fora
+da hierarquia.
+
+| Exceção | Status | Quando |
+|---|---|---|
+| `RecursoNaoEncontradoException` | 404 | id inexistente |
+| `TransicaoInvalidaException` | 409 | o estado atual não permite a ação |
+| `RegraNegocioException` | 422 | dado bem formado que viola uma regra |
+| `AcessoNegadoException` | 403 | alguém agindo em nome de outra pessoa |
+
+`AcessoNegadoException` é uma quarta subclasse, além das três mínimas do
+slide: a reação esperada do cliente é diferente (não há dado para corrigir,
+a pessoa simplesmente não pode fazer aquilo).
+
+Os estados não lançam mais `IllegalStateException`. As que sobraram no
+projeto (fábrica de estados, guardas internas da Proposta, estratégia de
+crédito ausente, crédito não aplicado) são **defeitos** de propósito e viram 500.
+
+### Política do handler
+
+| Exceção | Status | `codigo` | Registro |
+|---|---|---|---|
+| `RecursoNaoEncontradoException` | 404 | específico | nenhum |
+| `TransicaoInvalidaException` | 409 | específico | nenhum |
+| `RegraNegocioException` | 422 | específico | nenhum |
+| `AcessoNegadoException` | 403 | específico | nenhum |
+| `OptimisticLockingFailureException` | 409 | `PROPOSTA_ALTERADA_CONCORRENTEMENTE` | `log.warn` |
+| `DataIntegrityViolationException` | 409 | `RESTRICAO_DE_INTEGRIDADE` | `log.warn` |
+| Validação (`@Valid`) | 400 | `VALIDACAO` + lista `campos` | nenhum |
+| Erros do Spring MVC (JSON quebrado, id não numérico, método) | 400 / 405 | gerado pelo Spring | nenhum |
+| Qualquer outra `Exception` | 500 | `ERRO_INTERNO` + `ocorrencia` | `log.error` + LogEvento `ERRO_SISTEMA` |
+
+Só defeito vai para o LogEvento. O 500 nunca devolve `ex.getMessage()`; o id
+em `ocorrencia` é o mesmo gravado em `GET /logs?tipo=ERRO_SISTEMA`. O
+handler herda de `ResponseEntityExceptionHandler`, que já responde as
+exceções do Spring MVC como ProblemDetail.
+
+### Catálogo de códigos
+
+| Código | Status | Significado |
+|---|---|---|
+| `USUARIO_NAO_ENCONTRADO` | 404 | usuário inexistente (por id ou e-mail) |
+| `ITEM_NAO_ENCONTRADO` | 404 | item inexistente |
+| `PROPOSTA_NAO_ENCONTRADA` | 404 | proposta inexistente |
+| `AVALIACAO_NAO_ENCONTRADA` | 404 | avaliação inexistente |
+| `PROPOSTA_TRANSICAO_INVALIDA` | 409 | a máquina da raiz não permite a ação |
+| `CONTRAPROPOSTA_TRANSICAO_INVALIDA` | 409 | a máquina da contraproposta não permite a ação |
+| `PROPOSTA_NAO_RECEBE_CONTRAPROPOSTA` | 409 | contraproposta para uma proposta que não está Ativa |
+| `PROPOSTA_SEM_NEGOCIACAO` | 409 | finalizar uma raiz sem contraproposta em negociação |
+| `AVALIACAO_JA_PREENCHIDA` | 409 | avaliar de novo |
+| `PROPOSTA_ALTERADA_CONCORRENTEMENTE` | 409 | perdeu a corrida para outra requisição (`@Version`) |
+| `RESTRICAO_DE_INTEGRIDADE` | 409 | restrição do banco (ex.: remover item em uso) |
+| `ITEM_DE_OUTRO_USUARIO` | 422 | oferecer item que não é seu |
+| `CONTRAPROPOSTA_PARA_SI_MESMO` | 422 | contrapropor a própria proposta |
+| `CONTRAPROPOSTA_DE_CONTRAPROPOSTA` | 422 | contrapropor uma contraproposta |
+| `ACAO_EXCLUSIVA_DA_RAIZ` | 422 | aprovar uma contraproposta |
+| `ACAO_EXCLUSIVA_DA_CONTRAPROPOSTA` | 422 | aceitar, recusar ou desistir numa raiz |
+| `AVALIACAO_NOTA_INVALIDA` | 422 | nota fora de 1 a 5 |
+| `EMAIL_JA_CADASTRADO` | 422 | e-mail já usado por outro usuário |
+| `ITEM_DADOS_INCOMPLETOS` | 422 | item sem o campo do seu tipo (Aula 12) |
+| `ITEM_CAMPO_INCOMPATIVEL` | 422 | item com campo de outro tipo (Aula 12) |
+| `ITEM_CATEGORIA_IMUTAVEL` | 422 | mudar a categoria de um item no `PUT` (Aula 12) |
+| `PROPOSTA_ACAO_NAO_AUTORIZADA` | 403 | aceitar, recusar ou desistir sem ser parte |
+| `AVALIACAO_AUTOR_INVALIDO` | 403 | preencher a avaliação de outra pessoa |
+| `VALIDACAO` | 400 | campos inválidos (lista em `campos`) |
+| `ERRO_INTERNO` | 500 | defeito; informe a `ocorrencia` ao suporte |
+
+### Notificação com falha e retry
+
+Na Aula 11, o serviço de notificação simulado (hoje `NotificacaoSimuladaAdapter`)
+passou a demorar `trokr.notificacao.latencia-ms` e a falhar com probabilidade
+`trokr.notificacao.taxa-falha`, lançando `NotificacaoIndisponivelException`
+(exceção técnica, fora da hierarquia). O retry com espera crescente (200, 400,
+800 ms), só para essa exceção, morava no `NotificarUsuariosListener`. Com o
+serviço morto, cada finalização gastava ~2 s e 6 chamadas inúteis: o ponto de
+partida da [Aula 13](#entrega-final--aula-13-tolerância-a-falhas-hexagonal-e-decorator),
+onde o retry virou camada e ganhou um disjuntor.
+
+## Entrega Final — Aula 12: Factory e Builder
+
+Os tipos de oferta passaram a ter dados próprios: produto tem **peso**,
+serviço tem **duração** e experiência tem **nível**. Cada tipo virou uma
+subclasse de `Item`, e quem cria cada uma é a sua fábrica.
+
+### Herança: SINGLE_TABLE com a categoria como discriminador
+
+| Classe | Campo próprio | Valor da coluna `categoria` |
+|---|---|---|
+| `model/Item` (abstrata) | `titulo`, `descricao`, `usuarioProprietario`, `dataCriacao` | — |
+| `model/ItemProduto` | `pesoGramas: Integer` | `PRODUTO` |
+| `model/ItemServico` | `duracaoMinutos: Integer` | `SERVICO` |
+| `model/ItemExperiencia` | `nivel: NivelExperiencia` (`INICIANTE`, `INTERMEDIARIO`, `AVANCADO`) | `EXPERIENCIA` |
+
+- Uma tabela só (`item`). A coluna `categoria`, criada na Aula 9, virou o
+  `@DiscriminatorColumn`: os itens antigos carregam como a subclasse certa.
+- `getCategoria()` é **abstrato**: cada subclasse responde com a sua
+  constante. A Strategy de créditos (Aula 9) continua chamando
+  `item.getCategoria()` e não mudou uma linha; os testes `Credito*Test`
+  passam como antes.
+- **Sem `instanceof`**: com `LAZY` o Hibernate entrega um proxy de `Item`, e o
+  `instanceof ItemProduto` falharia. Quem precisa do tipo pergunta ao objeto:
+  `getCategoria()` e `dadosDoTipo()` são polimórficos (é o `dadosDoTipo()` que
+  o `ItemResponseDTO` usa).
+- Preço do SINGLE_TABLE: `peso_gramas`, `duracao_minutos` e `nivel` aceitam
+  nulo no banco. A garantia "todo produto tem peso" passa para o código, na
+  criação: é o trabalho da fábrica.
+
+### Factory Method: uma fábrica por tipo e um catálogo que escolhe
+
+| Peça | Onde está | Papel |
+|---|---|---|
+| `FabricaDeItem` | `factory/FabricaDeItem` | `categoria()`, `validar(DadosDoTipo)`, `criar(ItemRequestDTO, Usuario)` |
+| 3 fábricas | `factory/FabricaItemProduto`, `FabricaItemServico`, `FabricaItemExperiencia` | Exigem o campo do tipo, rejeitam os dos outros e montam com o builder |
+| Catálogo | `factory/CatalogoDeFabricas` | `Map<CategoriaItem, FabricaDeItem>` montado da lista injetada pelo Spring, igual ao da `CalculadoraCreditoService` |
+
+Fluxo de `POST /itens`: o `ItemService` recebe o DTO e busca o dono → o
+catálogo escolhe a fábrica pela categoria → a fábrica valida e lança as
+exceções da Aula 11 → o builder monta e o service salva, **sem switch e sem
+`new` de subclasse**.
+
+| Regra de criação | Exemplo | Resposta |
+|---|---|---|
+| Campo obrigatório do tipo | produto sem `pesoGramas` | 422 `ITEM_DADOS_INCOMPLETOS` |
+| Campo de outro tipo | serviço com `pesoGramas` | 422 `ITEM_CAMPO_INCOMPATIVEL` |
+| Valor sem sentido | `pesoGramas` ≤ 0 | 400 `VALIDACAO` (Bean Validation) |
+| Trocar a categoria no `PUT` | produto virar serviço | 422 `ITEM_CATEGORIA_IMUTAVEL` |
+
+**Teste de fogo: um tipo novo (ITEM DIGITAL, `tamanhoMb`)**. Só se
+acrescenta `ItemDigital`, `FabricaItemDigital`, `CreditoDigital` e os testes;
+só se modificam `CategoriaItem` (ganha `DIGITAL`) e o DTO (ganha
+`tamanhoMb`). `ItemService`, `CatalogoDeFabricas`,
+`CalculadoraCreditoService` e `Proposta` não mudam.
+
+### Builder: `@SuperBuilder` na hierarquia
+
+`@Builder` não enxerga os campos da classe mãe; `@SuperBuilder`, em `Item` e
+em cada subclasse, enxerga:
+
+```java
+ItemProduto bicicleta = ItemProduto.builder()
+        .titulo("Bicicleta aro 29")       // campo de Item
+        .descricao("Pouco usada")
+        .usuarioProprietario(ana)
+        .pesoGramas(14500)                 // campo de ItemProduto
+        .build();
+```
+
+Cuidados de entidade JPA: `@NoArgsConstructor(access = PROTECTED)` (o JPA
+precisa do construtor vazio), nada de `@Data` (só `@Getter`), e `dataCriacao`
+vem do `@CreationTimestamp`, não de um inicializador. O builder não valida
+nada: quem valida é a fábrica, antes do `build()`. Nos testes, o builder
+monta itens sem fábrica (`Fixtures.item`).
+
+Diagramas: `diagramas/DiagramaFactoryBuilderAula12.png` (visão focada) e
+`DiagramaDeClasseV2.png` (completo, com as classes novas marcadas `<<Aula 12>>`).
+
+### Como demonstrar
+
+Depois do roteiro da Aula 9, rode a pasta **"Aula 12 · Factory e Builder"** da
+coleção: dois itens criados (201), as três recusas 422 com os códigos acima e
+o 400 de peso negativo. `GET /itens` mostra cada item só com o campo do seu
+tipo (um produto não aparece com `"nivel": null`).
+
+> A tabela `item` ganhou colunas. Na primeira subida depois desta versão,
+> zere o banco: `docker compose down -v` e `docker compose up --build`.
+
+## Entrega Final — Aula 13: tolerância a falhas, Hexagonal e Decorator
+
+Notificação é dependência **acessória**: a troca vale sem ela. Objetivo:
+quando o serviço de notificação cair, as finalizações continuam rápidas, as
+trocas são concluídas, e cada notificação que não saiu fica registrada.
+
+| Classe (`notificacao/`) | Papel |
+|---|---|
+| `NotificacaoPort` | A **porta** (Hexagonal): `notificar(usuarioId, mensagem)`. A única coisa que o listener conhece |
+| `NotificacaoSimuladaAdapter` | O **adaptador**: o `NotificacaoService` da Aula 11, renomeado. Corpo igual, mais o interruptor na primeira linha |
+| `SimulacaoNotificacao` | O interruptor: serviço no ar ou fora do ar (`AtomicBoolean`) |
+| `NotificacaoComRetry` | **Decorator** 1: o laço de retry que estava no listener |
+| `NotificacaoComDisjuntor` | **Decorator** 2: o circuit breaker (fechado → aberto → meio-aberto) |
+| `NotificacaoConfig` | Monta a pilha como `@Bean @Primary`: retry por fora, disjuntor por dentro, adaptador no centro |
+| `NotificacaoProperties` | As chaves `trokr.notificacao.*` num record (`@ConfigurationProperties`) |
+| `controller/DemoNotificacaoController` | `PATCH /demo/notificacao/fora-do-ar` e `/no-ar`, só com `trokr.demo.endpoints: true` |
+
+```
+NotificarUsuariosListener ─▶ NotificacaoComRetry ─▶ NotificacaoComDisjuntor ─▶ NotificacaoSimuladaAdapter
+          (só a regra)          (tenta de novo)        (para de tentar)            (fala com o "serviço")
+```
+
+O listener ficou só com a regra: para quem mandar, o que mandar, e o que
+fazer se a pilha desistir (`log.error` + `ERRO_SISTEMA`, sem deixar nada subir).
+
+**Disjuntor** (`limite-falhas: 5`, `tempo-aberto: 30s`): fechado, conta as
+falhas seguidas; na 5ª, abre. Aberto, nada passa: registra
+`NOTIFICACAO_PENDENTE` no log e **retorna normalmente**, então o retry para
+na hora. Passados 30 s, deixa uma chamada de teste (meio-aberto): funcionou,
+fecha; falhou, abre de novo.
+
+**Por que o disjuntor é um Decorator?** Implementa a mesma `NotificacaoPort`
+que envolve: o listener não sabe que ele existe, e ele entra ou sai da pilha
+mudando só a `NotificacaoConfig`. **Por que por dentro do retry?** Assim cada
+tentativa do retry passa por ele e é contada, e quando ele abre o retry para
+na primeira tentativa. Por fora, ele só veria a falha final de cada pessoa,
+depois de todas as esperas.
+
+Diagramas: `diagramas/DiagramaNotificacaoAula13.png` (visão focada) e
+`DiagramaDeClasseV2.png` (completo, classes novas marcadas `<<Aula 13>>`).
+
+### Como demonstrar (passo 8 da aula)
+
+1. `./preparar-cenario.sh`: ele deixa duas negociações em NEGOCIADO (Raiz 1 e Raiz 2).
+2. `curl -X PATCH localhost:8090/demo/notificacao/fora-do-ar` (ou pelo Swagger, grupo "Demonstração").
+3. `PATCH /propostas/{Raiz 1}/finalizar`: pessoa A, tentativas 1, 2 e 3 falham → falha definitiva;
+   pessoa B, tentativas 4 e 5 falham → **"Disjuntor ABERTO"**, a 3ª vira pendente.
+4. `PATCH /propostas/{Raiz 2}/finalizar`: responde rápido, nenhuma chamada ao serviço, as duas pendentes na hora.
+5. `GET /logs?tipo=NOTIFICACAO_PENDENTE` mostra **três** pendências.
+6. `PATCH /demo/notificacao/no-ar`, espere 30 s, rode o `preparar-cenario.sh` de novo e finalize
+   uma troca: **"Disjuntor FECHADO"** no log e as notificações saem.
+
+O `PilhaDeNotificacaoTest` reproduz exatamente os passos 3 a 5, e o
+`NotificacaoComDisjuntorTest` os três estados com um relógio de teste.
+
+### Proxy (sem código)
+
+Mesma forma do Decorator, outra intenção: controla o acesso, e quem monta é
+a infraestrutura. O Trokr usa desde a Aula 3: os repositories (interfaces
+sem implementação), o `@Transactional` do `PropostaService` e o lazy loading
+do Hibernate (a armadilha do `instanceof` na Aula 12). Armadilha: o proxy só
+existe entre dois beans, então `this.metodoTransacional()` fala direto com o
+objeto real e a anotação vira enfeite; e um objeto criado com `new` nunca
+ganha proxy. Por isso as camadas da notificação, montadas com `new` na
+`NotificacaoConfig`, não dependem de nenhuma anotação do Spring.
+
+## Entrega Final — Aula 14: documentação viva e ADRs
+
+### Swagger / OpenAPI
+
+- Tela: **http://localhost:8090/swagger-ui.html** · contrato: `/v3/api-docs` (e `/v3/api-docs.yaml`).
+- `pom.xml`: `springdoc-openapi-starter-webmvc-ui` **3.2.0** (a linha do Spring Boot 4.1).
+- `application.yml`: rotas, ordem alfabética, "Try it out" já ativo e o tempo de cada requisição.
+- `config/OpenApiConfig`: título "Trokr API 1.0.0", descrição e o servidor `localhost:8090`.
+- `@Tag` em todos os controllers (Usuários, Itens, Propostas, Avaliações,
+  Histórico, Logs, Demonstração) e `@Hidden` no `HelloController`.
+- `@Operation` em todas as operações, `@Parameter` com exemplo nos ids, e
+  `@Schema` com descrição e exemplo nos DTOs de entrada.
+- **Contrato de erro visível**: cada operação declara com `@ApiResponse` só
+  os códigos que pode devolver (400 / 403 / 404 / 409 / 422), com
+  `application/problem+json` e o esquema `ProblemDetail`.
+  `springdoc.override-with-generic-response: false` evita que o springdoc
+  acrescente os erros do `GlobalExceptionHandler` em todas.
+- O grupo "Demonstração" só aparece com `trokr.demo.endpoints: true`.
+  `application-prod.yml` (perfil `prod`) desliga Swagger, contrato e
+  endpoints de demonstração.
+
+**Uma troca inteira pelo navegador**: no grupo Propostas, na ordem do
+`preparar-cenario.sh` (criar, `/submeter`, `/aprovar`, contrapropor,
+submeter a contraproposta, `/aceitar`, `/finalizar`). Finalizar de novo
+responde 409 com `application/problem+json`.
+
+### ADRs
+
+Em [`docs/adr/`](docs/adr/), no modelo da aula (Status, Contexto,
+Alternativas consideradas, Decisão, Consequências):
+
+| ADR | Decisão |
+|---|---|
+| [0001](docs/adr/0001-postgres-para-o-negocio-mongodb-para-o-log.md) | Postgres para o negócio, MongoDB para o log de eventos |
+| [0002](docs/adr/0002-bloqueio-otimista-com-version.md) | Bloqueio otimista com `@Version` na Proposta |
+| [0003](docs/adr/0003-disjuntor-escrito-a-mao.md) | Disjuntor e retry escritos à mão, como Decorators, em vez do Resilience4j |
+| [0004](docs/adr/0004-heranca-de-item-em-single-table.md) | Herança de Item em SINGLE_TABLE |
+| [0005](docs/adr/0005-monolito-modular.md) | Monolito modular em vez de microsserviços |
+
+Roteiro completo de testes, com as respostas esperadas e as perguntas prováveis: [`ROTEIRO_DE_TESTES.md`](ROTEIRO_DE_TESTES.md).
 
 ## Stack e decisões da Aula 1
 
@@ -155,6 +509,8 @@ src/main/java/com/trokr/
 ├── repository/   # Acesso a dados via Spring Data JPA (sem lógica própria)
 ├── model/        # Entidades JPA (representam as tabelas do banco)
 ├── dto/          # Objetos de entrada/saída da API (não expõem as entidades)
+├── notificacao/  # Aula 13: porta, adaptador e as camadas de retry e disjuntor
+├── factory/      # Aula 12: FabricaDeItem, uma fábrica por categoria e o catálogo
 └── exception/    # Exceções da aplicação e tratamento delas
 ```
 
@@ -172,9 +528,9 @@ Decisões desta fase que valem explicar:
 - **DTOs são `record`s do Java**, convertidos manualmente de/para entidade
   (métodos `fromEntity` nos DTOs de resposta). Sem MapStruct ou biblioteca
   de mapeamento.
-- **`Item` é uma entidade genérica** — ainda não existe distinção entre
-  produto físico, serviço ou aula, e não existe conceito de "Proposta de
-  Troca" ligando dois itens. Isso é conteúdo de aulas futuras.
+- **`Item` era uma entidade genérica** nesta fase. Desde a Aula 12 é
+  abstrato, com `ItemProduto`, `ItemServico` e `ItemExperiencia` (ver
+  [Aula 12](#entrega-final--aula-12-factory-e-builder)).
 - **Relação `Item → Usuario` é unidirecional**: o item conhece seu dono, mas
   `Usuario` não guarda uma lista de itens. Evita decisões de cascade/fetch
   type que ainda não fazem sentido discutir nesta fase.
@@ -262,6 +618,7 @@ GET /actuator/health
   "titulo": "Aula de violão",
   "descricao": "Aula básica de 1 hora, para iniciantes",
   "categoria": "SERVICO",
+  "duracaoMinutos": 60,
   "usuarioId": 1
 }
 ```
@@ -273,22 +630,21 @@ GET /actuator/health
   "id": 1,
   "titulo": "Aula de violão",
   "descricao": "Aula básica de 1 hora, para iniciantes",
+  "categoria": "SERVICO",
   "usuarioId": 1,
   "usuarioNome": "Maria Silva",
-  "dataCriacao": "2026-08-02T21:19:06.836283"
+  "dataCriacao": "2026-08-02T21:19:06.836283",
+  "duracaoMinutos": 60
 }
 ```
 
-**Erros comuns**
+Cada categoria exige o seu campo: `pesoGramas` (PRODUTO), `duracaoMinutos`
+(SERVICO) ou `nivel` (EXPERIENCIA: `INICIANTE`, `INTERMEDIARIO`, `AVANCADO`).
 
-- `400 Bad Request`: dados de entrada inválidos (ex.: `email` fora do
-  formato, campo obrigatório em branco)
-- `404 Not Found`: id de `usuario`/`item` inexistente, incluindo quando
-  `usuarioId` informado ao criar/atualizar um item não existe
-
-```json
-{ "erro": "Usuario não encontrado com id 999" }
-```
+**Erros comuns**: `400` (dados inválidos, com a lista `campos`), `404`
+(`USUARIO_NAO_ENCONTRADO`, `ITEM_NAO_ENCONTRADO`) e `422`
+(`ITEM_DADOS_INCOMPLETOS`, `ITEM_CAMPO_INCOMPATIVEL`, `ITEM_CATEGORIA_IMUTAVEL`), sempre no formato
+ProblemDetail descrito em [Contrato de erro](#entrega-final--aula-11-contrato-de-erro).
 
 ### Propostas e contrapropostas (Entrega 2)
 
@@ -312,8 +668,11 @@ GET /actuator/health
 | GET | `/historicos?propostaId=` | Histórico de uma proposta |
 | GET | `/logs?tipo=` · `/logs/nivel?nivel=ERROR&horas=24` | LogEvento no Mongo |
 
-Códigos de erro: 400 (entrada inválida), 403 (agir em nome de outra pessoa),
-404 (não encontrado), 409 (transição inválida ou conflito).
+Todos os erros seguem o [contrato de erro](#entrega-final--aula-11-contrato-de-erro):
+ProblemDetail com `status`, `codigo` estável e `detail`.
+
+Ferramentas de aula: `GET /demo/erro-inesperado` força um 500 (Aula 11);
+`preparar-cenario.sh` e `corrida.sh` reproduzem as corridas (Aula 10).
 
 ## Testando a API
 

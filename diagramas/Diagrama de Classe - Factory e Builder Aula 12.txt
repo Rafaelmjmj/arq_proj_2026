@@ -1,0 +1,73 @@
+@startuml
+' Aula 12 — Factory e Builder: visão focada para a apresentação.
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+
+class ItemController
+class ItemService {
+  + criar(dados: ItemRequestDTO): Item
+  + atualizar(id, dados: ItemRequestDTO): Item
+}
+class CatalogoDeFabricas {
+  - fabricas: Map<CategoriaItem, FabricaDeItem>
+  + criar(dados, dono): Item
+  + validarAtualizacao(existente, dados): void
+}
+interface FabricaDeItem <<Factory Method>> {
+  + categoria(): CategoriaItem
+  + validar(dados: DadosDoTipo): void
+  + criar(dados: ItemRequestDTO, dono: Usuario): Item
+}
+class FabricaItemProduto {
+  exige pesoGramas
+  rejeita duracaoMinutos, nivel
+}
+class FabricaItemServico {
+  exige duracaoMinutos
+  rejeita pesoGramas, nivel
+}
+class FabricaItemExperiencia {
+  exige nivel
+  rejeita pesoGramas, duracaoMinutos
+}
+
+abstract class Item <<@SuperBuilder · SINGLE_TABLE>> {
+  - titulo, descricao, usuarioProprietario
+  + {abstract} getCategoria(): CategoriaItem
+  + {abstract} dadosDoTipo(): DadosDoTipo
+}
+class ItemProduto <<PRODUTO>> {
+  - pesoGramas: Integer
+}
+class ItemServico <<SERVICO>> {
+  - duracaoMinutos: Integer
+}
+class ItemExperiencia <<EXPERIENCIA>> {
+  - nivel: NivelExperiencia
+}
+enum NivelExperiencia {
+  INICIANTE
+  INTERMEDIARIO
+  AVANCADO
+}
+class CalculadoraCreditoService <<Strategy · Aula 9>> {
+  + calcular(item: Item): int
+}
+class RegraNegocioException <<422>>
+
+ItemController --> ItemService
+ItemService --> CatalogoDeFabricas : 1. escolhe pela categoria
+CatalogoDeFabricas o--> "3" FabricaDeItem
+FabricaItemProduto ..|> FabricaDeItem
+FabricaItemServico ..|> FabricaDeItem
+FabricaItemExperiencia ..|> FabricaDeItem
+FabricaDeItem ..> RegraNegocioException : 2. valida\nITEM_DADOS_INCOMPLETOS\nITEM_CAMPO_INCOMPATIVEL\nITEM_CATEGORIA_IMUTAVEL
+FabricaItemProduto ..> ItemProduto : 3. builder()
+FabricaItemServico ..> ItemServico : 3. builder()
+FabricaItemExperiencia ..> ItemExperiencia : 3. builder()
+ItemProduto --|> Item
+ItemServico --|> Item
+ItemExperiencia --|> Item
+ItemExperiencia --> NivelExperiencia
+CalculadoraCreditoService ..> Item : getCategoria() — sem mudança
+@enduml

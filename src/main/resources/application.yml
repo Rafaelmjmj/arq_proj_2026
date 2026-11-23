@@ -40,3 +40,43 @@ management:
         # Expor só o necessário nesta fase: health (usado como /health do
         # enunciado) e info. Nada de segurança/autenticação em cima disso ainda.
         include: health,info
+
+# Configurações próprias do Trokr
+trokr:
+  demo:
+    # Aula 10 — atraso proposital para reproduzir as condições de corrida com
+    # o corrida.sh. 0 em uso normal; 2000 durante a demonstração. No Docker:
+    # TROKR_ATRASO_MS=2000 docker compose up (sem editar este arquivo).
+    atraso-ms: ${TROKR_ATRASO_MS:0}
+    # Aula 13 — liga o DemoNotificacaoController (/demo/notificacao/fora-do-ar
+    # e /no-ar). Só em aula: em produção, false (o controller nem é criado).
+    endpoints: ${TROKR_DEMO_ENDPOINTS:true}
+  notificacao:
+    # Aula 11 — o serviço de notificação simulado demora latencia-ms e falha
+    # com probabilidade taxa-falha (0.0 a 1.0). Desde a Aula 13 a taxa fica
+    # em 0.0: quem derruba o serviço é o interruptor (/demo/notificacao).
+    taxa-falha: ${TROKR_TAXA_FALHA:0.0}
+    latencia-ms: 150
+    # NotificacaoComRetry: tentativas e espera inicial (dobra a cada falha:
+    # 200, 400, 800 ms).
+    max-tentativas: 3
+    espera-inicial-ms: 200
+    # Aula 13 — NotificacaoComDisjuntor: abre depois de limite-falhas falhas
+    # seguidas e fica aberto por tempo-aberto antes da chamada de teste.
+    limite-falhas: 5
+    tempo-aberto: 30s
+
+# Aula 14 — Swagger / OpenAPI (springdoc). Os dois caminhos já são os
+# padrões; escritos aqui para ficar explícito onde mora cada coisa.
+springdoc:
+  api-docs:
+    path: /v3/api-docs               # a especificação em JSON (e /v3/api-docs.yaml)
+  swagger-ui:
+    path: /swagger-ui.html           # a tela (redireciona para /swagger-ui/index.html)
+    tags-sorter: alpha               # grupos em ordem alfabética
+    operations-sorter: method        # dentro do grupo, por método HTTP
+    try-it-out-enabled: true         # já abre com o "Try it out" ativo
+    display-request-duration: true   # tempo de cada requisição
+  # As respostas de erro são declaradas em cada operação; não deixar o
+  # springdoc acrescentar as do GlobalExceptionHandler em todas.
+  override-with-generic-response: false

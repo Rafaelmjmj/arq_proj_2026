@@ -1,5 +1,6 @@
 package com.trokr.model.state.contraproposta;
 
+import com.trokr.exception.TransicaoInvalidaException;
 import com.trokr.model.Proposta;
 import com.trokr.model.Status;
 
@@ -18,7 +19,7 @@ public class ContraAnalise implements EstadoContraproposta {
 
     @Override
     public void irParaEmAnalise(Proposta contraproposta) {
-        throw new IllegalStateException("A contraproposta já está como Em Análise. Transição inválida!");
+        throw TransicaoInvalidaException.daContraproposta("A contraproposta já está como Em Análise. Transição inválida!");
     }
 
     @Override
@@ -28,7 +29,7 @@ public class ContraAnalise implements EstadoContraproposta {
 
     @Override
     public void irParaFinalizado(Proposta contraproposta) {
-        throw new IllegalStateException(TRANSICAO_INVALIDA + "Finalizado");
+        throw TransicaoInvalidaException.daContraproposta(TRANSICAO_INVALIDA + "Finalizado");
     }
 
     @Override

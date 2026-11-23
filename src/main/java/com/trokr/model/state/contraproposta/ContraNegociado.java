@@ -1,5 +1,6 @@
 package com.trokr.model.state.contraproposta;
 
+import com.trokr.exception.TransicaoInvalidaException;
 import com.trokr.model.Proposta;
 import com.trokr.model.Status;
 
@@ -13,17 +14,17 @@ public class ContraNegociado implements EstadoContraproposta {
 
     @Override
     public void irParaRascunho(Proposta contraproposta) {
-        throw new IllegalStateException(TRANSICAO_INVALIDA + "Rascunho");
+        throw TransicaoInvalidaException.daContraproposta(TRANSICAO_INVALIDA + "Rascunho");
     }
 
     @Override
     public void irParaEmAnalise(Proposta contraproposta) {
-        throw new IllegalStateException(TRANSICAO_INVALIDA + "Em Análise");
+        throw TransicaoInvalidaException.daContraproposta(TRANSICAO_INVALIDA + "Em Análise");
     }
 
     @Override
     public void irParaNegociado(Proposta contraproposta) {
-        throw new IllegalStateException("A contraproposta já está como Negociado. Transição inválida!");
+        throw TransicaoInvalidaException.daContraproposta("A contraproposta já está como Negociado. Transição inválida!");
     }
 
     @Override
@@ -38,7 +39,7 @@ public class ContraNegociado implements EstadoContraproposta {
 
     @Override
     public void irParaCancelado(Proposta contraproposta) {
-        throw new IllegalStateException(TRANSICAO_INVALIDA + "Cancelado");
+        throw TransicaoInvalidaException.daContraproposta(TRANSICAO_INVALIDA + "Cancelado");
     }
 
     /** Efeito cascata. Estava em negociação e a raiz foi cancelada: a negociação não se concretizou, vira Recusado. */

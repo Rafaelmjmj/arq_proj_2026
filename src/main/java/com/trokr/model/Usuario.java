@@ -42,9 +42,10 @@ public class Usuario {
     /**
      * Aula 9 — créditos ganhos em trocas concluídas.
      *
-     * Sem setter de propósito: o saldo só muda por {@link #creditar(int)},
-     * chamado pelo AtribuirCreditosListener quando uma troca é concluída.
-     * Dado derivado de regra de negócio não se edita pela API.
+     * Sem setter de propósito: o saldo só muda pelo UPDATE atômico
+     * UsuarioRepository.adicionarCreditos, chamado pelo
+     * AtribuirCreditosListener quando uma troca é concluída (Aula 10,
+     * Corrida 2). Dado derivado de regra de negócio não se edita pela API.
      *
      * O "default 0" no banco evita erro do ddl-auto=update ao criar a coluna
      * NOT NULL numa tabela que já tem usuários cadastrados.
@@ -61,14 +62,6 @@ public class Usuario {
         this.nome = nome;
         this.email = email;
         this.cidade = cidade;
-    }
-
-    /** Soma créditos ao saldo. Só aceita valores positivos. */
-    public void creditar(int creditos) {
-        if (creditos <= 0) {
-            throw new IllegalArgumentException("Créditos devem ser positivos: " + creditos);
-        }
-        this.saldoCreditos = (saldoCreditos == null ? 0 : saldoCreditos) + creditos;
     }
 
     /** Compara pelo id — útil nas validações de autoria (quem pode aceitar, avaliar...). */

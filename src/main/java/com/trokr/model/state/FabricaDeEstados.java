@@ -61,6 +61,8 @@ public final class FabricaDeEstados {
     private static <T> T buscar(Map<Status, Supplier<T>> mapa, Status status, String maquina) {
         Supplier<T> fabrica = mapa.get(status);
         if (fabrica == null) {
+            // Defeito, não regra de negócio: um status gravado que a máquina
+            // não conhece. Fica IllegalStateException de propósito → 500.
             throw new IllegalStateException("Status " + status + " não existe na máquina de " + maquina);
         }
         return fabrica.get();

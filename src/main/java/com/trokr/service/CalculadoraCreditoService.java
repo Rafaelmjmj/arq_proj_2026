@@ -34,6 +34,7 @@ public class CalculadoraCreditoService {
     public int calcular(Item item) {
         EstrategiaCredito estrategia = estrategias.get(item.getCategoria());
         if (estrategia == null) {
+            // Defeito de configuração, não regra de negócio → 500.
             throw new IllegalStateException("Nenhuma estratégia de crédito para a categoria " + item.getCategoria());
         }
         return estrategia.calcular(item);

@@ -8,7 +8,8 @@ import com.trokr.model.Status;
  *
  * Opção A da Aula 5-6: interface separada da raiz ({@code EstadoProposta}).
  * A mesma entidade Proposta usa esta interface quando é uma réplica, e a
- * outra quando é raiz — cada máquina 100% independente.
+ * outra quando é raiz — cada máquina 100% independente. Transições
+ * inválidas lançam TransicaoInvalidaException (HTTP 409).
  */
 public interface EstadoContraproposta {
 

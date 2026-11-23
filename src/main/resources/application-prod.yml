@@ -1,0 +1,12 @@
+# Aula 14 — perfil de produção (SPRING_PROFILES_ACTIVE=prod): sem a tela e o
+# contrato do Swagger e sem os endpoints de demonstração. Publicar ou não o
+# contrato é uma decisão de quem consome a API; aqui ela virou configuração.
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+trokr:
+  demo:
+    endpoints: false

@@ -1,6 +1,7 @@
 package com.trokr.service;
 
-import com.trokr.exception.ResourceNotFoundException;
+import com.trokr.exception.RecursoNaoEncontradoException;
+import com.trokr.exception.RegraNegocioException;
 import com.trokr.model.Usuario;
 import com.trokr.repository.UsuarioRepository;
 import java.util.List;
@@ -25,19 +26,22 @@ public class UsuarioService {
 
     public Usuario buscarPorId(Long id) {
         return usuarioRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Usuario não encontrado com id " + id));
+                .orElseThrow(() -> RecursoNaoEncontradoException.usuario(id));
     }
     public Usuario buscarPorEmail(String email) {
         return usuarioRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado com email: " + email));
+                .orElseThrow(() -> new RecursoNaoEncontradoException("USUARIO_NAO_ENCONTRADO",
+                        "Usuário não encontrado com email " + email));
     }
 
     public Usuario criar(Usuario usuario) {
+        exigirEmailLivre(usuario.getEmail(), null);
         return usuarioRepository.save(usuario);
     }
 
     public Usuario atualizar(Long id, Usuario dadosAtualizados) {
         Usuario usuarioExistente = buscarPorId(id);
+        exigirEmailLivre(dadosAtualizados.getEmail(), id);
         usuarioExistente.setNome(dadosAtualizados.getNome());
         usuarioExistente.setEmail(dadosAtualizados.getEmail());
         usuarioExistente.setCidade(dadosAtualizados.getCidade());
@@ -49,4 +53,16 @@ public class UsuarioService {
         usuarioRepository.delete(usuario);
     }
 
+    /**
+     * E-mail duplicado é regra de negócio (422, EMAIL_JA_CADASTRADO), não um
+     * erro de banco: conferimos antes de gravar, em vez de deixar a
+     * constraint UNIQUE estourar como DataIntegrityViolationException.
+     */
+    private void exigirEmailLivre(String email, Long idAtual) {
+        usuarioRepository.findByEmail(email)
+                .filter(outro -> !outro.getId().equals(idAtual))
+                .ifPresent(outro -> {
+                    throw new RegraNegocioException("EMAIL_JA_CADASTRADO", "Já existe um usuário com o e-mail " + email);
+                });
+    }
 }

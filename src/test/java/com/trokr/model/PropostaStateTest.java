@@ -10,6 +10,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.trokr.exception.AcessoNegadoException;
+import com.trokr.exception.RegraNegocioException;
+import com.trokr.exception.TransicaoInvalidaException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -66,14 +68,14 @@ class PropostaStateTest {
     @Test
     void naoAprovaPropostaAindaEmRascunho() {
         Proposta proposta = new Proposta("Troco bicicleta", "Aro 29", ana, bicicleta);
-        assertThrows(IllegalStateException.class, proposta::aprovar);
+        assertThrows(TransicaoInvalidaException.class, proposta::aprovar);
         assertEquals(Status.RASCUNHO, proposta.getStatus());
     }
 
     @Test
     void naoFinalizaSemContrapropostaEmNegociacao() {
         Proposta proposta = propostaAtiva(ana, bicicleta);
-        assertThrows(IllegalStateException.class, proposta::finalizar);
+        assertThrows(TransicaoInvalidaException.class, proposta::finalizar);
     }
 
     @Test
@@ -82,14 +84,26 @@ class PropostaStateTest {
         proposta.cancelar();
         assertEquals(Status.CANCELADO_RAIZ, proposta.getStatus());
         assertFalse(proposta.isPodeMudar());
-        assertThrows(IllegalStateException.class, proposta::submeter);
-        assertThrows(IllegalStateException.class, proposta::cancelar);
+        assertThrows(TransicaoInvalidaException.class, proposta::submeter);
+        assertThrows(TransicaoInvalidaException.class, proposta::cancelar);
     }
 
     @Test
     void naoOfereceItemDeOutraPessoa() {
-        assertThrows(IllegalArgumentException.class,
+        RegraNegocioException erro = assertThrows(RegraNegocioException.class,
                 () -> new Proposta("Troco violão", "?", ana, aulaViolao));
+        assertEquals("ITEM_DE_OUTRO_USUARIO", erro.getCodigo());
+    }
+
+    @Test
+    void transicaoInvalidaCarregaOCodigoDaMaquinaCerta() {
+        Proposta raiz = new Proposta("Troco bicicleta", "Aro 29", ana, bicicleta);
+        TransicaoInvalidaException daRaiz = assertThrows(TransicaoInvalidaException.class, raiz::aprovar);
+        assertEquals(TransicaoInvalidaException.PROPOSTA, daRaiz.getCodigo());
+
+        Proposta contra = Proposta.criarContraProposta("Ofereço aula", bruno, aulaViolao, propostaAtiva(ana, bicicleta));
+        TransicaoInvalidaException daContra = assertThrows(TransicaoInvalidaException.class, () -> contra.aceitar(ana));
+        assertEquals(TransicaoInvalidaException.CONTRAPROPOSTA, daContra.getCodigo());
     }
 
     // ---------------- máquina da contraproposta ----------------
@@ -105,13 +119,13 @@ class PropostaStateTest {
         contra.submeter(); // na contraproposta, submeter leva a Em Análise (não Homologação)
         assertEquals(Status.EM_ANALISE, contra.getStatus());
 
-        assertThrows(IllegalStateException.class, contra::aprovar); // aprovar é só da raiz
+        assertThrows(RegraNegocioException.class, contra::aprovar); // aprovar é só da raiz
     }
 
     @Test
     void soPropostaAtivaRecebeContraproposta() {
         Proposta emRascunho = new Proposta("Troco bicicleta", "Aro 29", ana, bicicleta);
-        assertThrows(IllegalStateException.class,
+        assertThrows(TransicaoInvalidaException.class,
                 () -> Proposta.criarContraProposta("Ofereço aula", bruno, aulaViolao, emRascunho));
     }
 
@@ -119,7 +133,7 @@ class PropostaStateTest {
     void naoContrapropoeAPropriaProposta() {
         Proposta raiz = propostaAtiva(ana, bicicleta);
         Item outroDaAna = item(11, "Livro", CategoriaItem.PRODUTO, ana);
-        assertThrows(IllegalArgumentException.class,
+        assertThrows(RegraNegocioException.class,
                 () -> Proposta.criarContraProposta("?", ana, outroDaAna, raiz));
     }
 
@@ -148,7 +162,7 @@ class PropostaStateTest {
     void naoAceitaContrapropostaAindaEmRascunho() {
         Proposta raiz = propostaAtiva(ana, bicicleta);
         Proposta contra = Proposta.criarContraProposta("Ofereço aula", bruno, aulaViolao, raiz);
-        assertThrows(IllegalStateException.class, () -> contra.aceitar(ana));
+        assertThrows(TransicaoInvalidaException.class, () -> contra.aceitar(ana));
         assertEquals(Status.ATIVA, raiz.getStatus());
     }
 
@@ -161,7 +175,7 @@ class PropostaStateTest {
         contraBruno.aceitar(ana);
 
         // a raiz já está em Negociado: a máquina da raiz barra a segunda aceitação
-        assertThrows(IllegalStateException.class, () -> contraCarla.aceitar(ana));
+        assertThrows(TransicaoInvalidaException.class, () -> contraCarla.aceitar(ana));
     }
 
     @Test
@@ -240,7 +254,7 @@ class PropostaStateTest {
         Proposta contraCarla = contrapropostaEmAnalise(raiz, carla, passeio);
         contraBruno.aceitar(ana);
 
-        assertThrows(IllegalStateException.class, contraCarla::finalizar);
+        assertThrows(TransicaoInvalidaException.class, contraCarla::finalizar);
         assertEquals(Status.NEGOCIADO_RAIZ, raiz.getStatus());
     }
 
@@ -267,7 +281,7 @@ class PropostaStateTest {
 
         assertFalse(raiz.isPodeMudar());
         assertFalse(contra.isPodeMudar());
-        assertThrows(IllegalStateException.class, raiz::cancelar);
-        assertThrows(IllegalStateException.class, raiz::finalizar);
+        assertThrows(TransicaoInvalidaException.class, raiz::cancelar);
+        assertThrows(TransicaoInvalidaException.class, raiz::finalizar);
     }
 }

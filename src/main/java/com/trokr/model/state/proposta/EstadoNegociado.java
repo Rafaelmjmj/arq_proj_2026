@@ -1,5 +1,6 @@
 package com.trokr.model.state.proposta;
 
+import com.trokr.exception.TransicaoInvalidaException;
 import com.trokr.model.Proposta;
 import com.trokr.model.Status;
 
@@ -13,12 +14,12 @@ public class EstadoNegociado implements EstadoProposta {
 
     @Override
     public void irParaRascunho(Proposta proposta) {
-        throw new IllegalStateException(TRANSICAO_INVALIDA + "Rascunho");
+        throw TransicaoInvalidaException.daProposta(TRANSICAO_INVALIDA + "Rascunho");
     }
 
     @Override
     public void irParaHomologacao(Proposta proposta) {
-        throw new IllegalStateException(TRANSICAO_INVALIDA + "Homologação");
+        throw TransicaoInvalidaException.daProposta(TRANSICAO_INVALIDA + "Homologação");
     }
 
     @Override
@@ -28,7 +29,7 @@ public class EstadoNegociado implements EstadoProposta {
 
     @Override
     public void irParaNegociado(Proposta proposta) {
-        throw new IllegalStateException("A proposta já está como Negociado. Transição inválida!");
+        throw TransicaoInvalidaException.daProposta("A proposta já está como Negociado. Transição inválida!");
     }
 
     @Override

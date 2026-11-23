@@ -12,7 +12,7 @@ import com.trokr.model.Status;
  * "se for contraproposta..." escondido dentro dos estados.
  *
  * Cada estado concreto sabe as SUAS transições válidas e lança
- * IllegalStateException para todas as outras.
+ * TransicaoInvalidaException (HTTP 409) para todas as outras.
  */
 public interface EstadoProposta {
 

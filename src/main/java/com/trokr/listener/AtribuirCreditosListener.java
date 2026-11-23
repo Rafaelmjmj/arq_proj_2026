@@ -1,10 +1,10 @@
 package com.trokr.listener;
 
 import com.trokr.event.TrocaConcluidaEvent;
+import com.trokr.model.Item;
 import com.trokr.model.Usuario;
 import com.trokr.repository.UsuarioRepository;
 import com.trokr.service.CalculadoraCreditoService;
-import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
@@ -14,8 +14,19 @@ import org.springframework.stereotype.Component;
  * OFERECEU. Não sabe calcular crédito: pede à CalculadoraCreditoService,
  * que escolhe a estratégia pela categoria do item (Strategy).
  *
- * O Observer pagando dividendos: para os créditos existirem, nenhuma linha
- * do PropostaService, do evento ou dos outros quatro listeners mudou.
+ * Aula 10, Corrida 2: antes o listener buscava o Usuario, somava no objeto
+ * Java e salvava (read-modify-write) — duas trocas do mesmo usuário ao mesmo
+ * tempo perdiam créditos. Agora a Strategy continua decidindo QUANTO
+ * creditar; só mudou o jeito de GRAVAR: um UPDATE atômico no banco.
+ *
+ * Fica DENTRO da transação da finalização (@EventListener): se ela sofrer
+ * rollback (Corrida 1), o crédito também é desfeito.
+ *
+ * Os dois créditos são aplicados SEMPRE em ordem crescente de id do usuário.
+ * Cada UPDATE trava a linha do usuário até o commit; se a troca A↔B e a troca
+ * B↔A fossem finalizadas ao mesmo tempo creditando em ordens opostas, uma
+ * esperaria a outra para sempre (deadlock, Aula 10). Com a mesma ordem para
+ * todos, o ciclo não se forma.
  */
 @Component
 @RequiredArgsConstructor
@@ -26,12 +37,23 @@ public class AtribuirCreditosListener {
 
     @EventListener
     public void aoConcluirTroca(TrocaConcluidaEvent evento) {
-        Usuario usuarioA = evento.usuarioA();
-        Usuario usuarioB = evento.usuarioB();
+        if (evento.usuarioA().getId() <= evento.usuarioB().getId()) {
+            creditar(evento.usuarioA(), evento.itemA());
+            creditar(evento.usuarioB(), evento.itemB());
+        } else {
+            creditar(evento.usuarioB(), evento.itemB());
+            creditar(evento.usuarioA(), evento.itemA());
+        }
+    }
 
-        usuarioA.creditar(calculadora.calcular(evento.itemA()));
-        usuarioB.creditar(calculadora.calcular(evento.itemB()));
-
-        usuarioRepository.saveAll(List.of(usuarioA, usuarioB));
+    private void creditar(Usuario usuario, Item itemOferecido) {
+        int creditos = calculadora.calcular(itemOferecido);
+        int linhas = usuarioRepository.adicionarCreditos(usuario.getId(), creditos);
+        if (linhas != 1) {
+            // Defeito: o usuário veio de uma Proposta válida e tinha de existir.
+            // Exceção técnica → 500 e rollback da troca inteira.
+            throw new IllegalStateException("Crédito não aplicado ao usuário " + usuario.getId()
+                    + " (linhas afetadas: " + linhas + ")");
+        }
     }
 }

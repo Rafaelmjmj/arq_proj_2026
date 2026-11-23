@@ -43,7 +43,19 @@ public class LogEventoService {
 
     /** Erro de sistema: o payload guarda a exceção. Sem usuário associado. */
     public void registrarErro(String origem, String mensagem, Exception excecao) {
+        registrarErro(origem, mensagem, excecao, null);
+    }
+
+    /**
+     * Aula 11 — erro de sistema com o identificador da ocorrência: o mesmo id
+     * que vai na resposta 500 ao cliente fica no payload, e o suporte acha a
+     * ocorrência exata em GET /logs?tipo=ERRO_SISTEMA.
+     */
+    public void registrarErro(String origem, String mensagem, Exception excecao, String ocorrencia) {
         Map<String, Object> payload = new LinkedHashMap<>();
+        if (ocorrencia != null) {
+            payload.put("ocorrencia", ocorrencia);
+        }
         payload.put("excecao", excecao.getClass().getName());
         payload.put("mensagemExcecao", String.valueOf(excecao.getMessage()));
         registrar(EventoRegistrado.novo(TIPO_ERRO_SISTEMA, NivelLog.ERROR, origem, mensagem, payload, null));

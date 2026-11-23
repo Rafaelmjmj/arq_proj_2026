@@ -34,8 +34,8 @@ class TrocaConcluidaEvent <<record>> {
 
 class AtualizarAvaliacaoListener
 class RegistrarHistoricoListener
-class NotificarUsuariosListener
-class RegistrarLogEventoListener
+class NotificarUsuariosListener <<AFTER_COMMIT>>
+class RegistrarLogEventoListener <<AFTER_COMMIT>>
 class AtribuirCreditosListener
 
 class CalculadoraCreditoService <<Contexto da Strategy>> {

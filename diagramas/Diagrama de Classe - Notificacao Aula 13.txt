@@ -1,0 +1,47 @@
+@startuml
+' Aula 13 — Tolerância a falhas: Hexagonal + Decorator + disjuntor (visão focada).
+skinparam classAttributeIconSize 0
+
+class NotificarUsuariosListener <<AFTER_COMMIT>> {
+  + aoConcluirTroca(e: TrocaConcluidaEvent)
+}
+interface NotificacaoPort <<porta>> {
+  + notificar(usuarioId: Long, mensagem: String)
+}
+class NotificacaoComRetry <<Decorator · por fora>> {
+  - maxTentativas = 3
+  - esperaInicialMs = 200, dobra a cada falha
+}
+class NotificacaoComDisjuntor <<Decorator · por dentro>> {
+  - limiteFalhas = 5
+  - tempoAberto = 30s
+  - falhasSeguidas: int
+  - abertoAte: Instant
+}
+class NotificacaoSimuladaAdapter <<adaptador>>
+class SimulacaoNotificacao <<interruptor>> {
+  + derrubar()
+  + religar()
+}
+class DemoNotificacaoController <<só com trokr.demo.endpoints>>
+class NotificacaoConfig <<@Bean @Primary>>
+class LogEventoService
+
+NotificarUsuariosListener --> NotificacaoPort : conhece só a porta
+NotificacaoComRetry ..|> NotificacaoPort
+NotificacaoComDisjuntor ..|> NotificacaoPort
+NotificacaoSimuladaAdapter ..|> NotificacaoPort
+NotificacaoComRetry o--> NotificacaoComDisjuntor : proximo
+NotificacaoComDisjuntor o--> NotificacaoSimuladaAdapter : proximo
+NotificacaoComDisjuntor --> LogEventoService : aberto: NOTIFICACAO_PENDENTE
+NotificacaoSimuladaAdapter --> SimulacaoNotificacao
+DemoNotificacaoController --> SimulacaoNotificacao : PATCH fora-do-ar / no-ar
+NotificacaoConfig ..> NotificacaoComRetry : monta a pilha
+
+note right of NotificacaoComDisjuntor
+  FECHADO → ABERTO: 5 falhas seguidas
+  ABERTO → MEIO-ABERTO: passados 30 s, 1 chamada de teste
+  MEIO-ABERTO → FECHADO: o teste funcionou
+  MEIO-ABERTO → ABERTO: o teste falhou
+end note
+@enduml

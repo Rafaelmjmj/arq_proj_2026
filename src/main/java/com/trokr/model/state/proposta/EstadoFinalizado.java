@@ -1,5 +1,6 @@
 package com.trokr.model.state.proposta;
 
+import com.trokr.exception.TransicaoInvalidaException;
 import com.trokr.model.Proposta;
 import com.trokr.model.Status;
 
@@ -13,32 +14,32 @@ public class EstadoFinalizado implements EstadoProposta {
 
     @Override
     public void irParaRascunho(Proposta proposta) {
-        throw new IllegalStateException(TRANSICAO_INVALIDA + "Rascunho");
+        throw TransicaoInvalidaException.daProposta(TRANSICAO_INVALIDA + "Rascunho");
     }
 
     @Override
     public void irParaHomologacao(Proposta proposta) {
-        throw new IllegalStateException(TRANSICAO_INVALIDA + "Homologação");
+        throw TransicaoInvalidaException.daProposta(TRANSICAO_INVALIDA + "Homologação");
     }
 
     @Override
     public void irParaAtiva(Proposta proposta) {
-        throw new IllegalStateException(TRANSICAO_INVALIDA + "Ativa");
+        throw TransicaoInvalidaException.daProposta(TRANSICAO_INVALIDA + "Ativa");
     }
 
     @Override
     public void irParaNegociado(Proposta proposta) {
-        throw new IllegalStateException(TRANSICAO_INVALIDA + "Negociado");
+        throw TransicaoInvalidaException.daProposta(TRANSICAO_INVALIDA + "Negociado");
     }
 
     @Override
     public void irParaFinalizado(Proposta proposta) {
-        throw new IllegalStateException("A proposta já está como Finalizado. Transição inválida!");
+        throw TransicaoInvalidaException.daProposta("A proposta já está como Finalizado. Transição inválida!");
     }
 
     @Override
     public void irParaCancelado(Proposta proposta) {
-        throw new IllegalStateException(TRANSICAO_INVALIDA + "Cancelado");
+        throw TransicaoInvalidaException.daProposta(TRANSICAO_INVALIDA + "Cancelado");
     }
 
     @Override

@@ -1,6 +1,8 @@
 package com.trokr.model;
 
 import com.trokr.exception.AcessoNegadoException;
+import com.trokr.exception.RegraNegocioException;
+import com.trokr.exception.TransicaoInvalidaException;
 import com.trokr.model.state.FabricaDeEstados;
 import com.trokr.model.state.contraproposta.EstadoContraproposta;
 import com.trokr.model.state.proposta.EstadoProposta;
@@ -17,6 +19,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import jakarta.persistence.Transient;
+import jakarta.persistence.Version;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -89,6 +92,23 @@ public class Proposta {
     @Column(nullable = false, updatable = false)
     private LocalDateTime dataCriacao;
 
+    /**
+     * Aula 10, Corrida 1 — lock otimista. O Hibernate incrementa este número a
+     * cada UPDATE e o usa como condição ("... where id = ? and versao = ?").
+     * Se duas requisições finalizarem a mesma Proposta ao mesmo tempo, a
+     * segunda grava com uma versão que já não existe, afeta 0 linhas e recebe
+     * ObjectOptimisticLockingFailureException: a transação dela inteira é
+     * desfeita e o cliente recebe 409.
+     *
+     * Sem setter e fora dos DTOs: só o Hibernate escreve aqui. O campo fica
+     * sem valor inicial de propósito: com o wrapper nulo, o Spring Data
+     * reconhece a Proposta nova e faz persist (o Hibernate grava 0); o
+     * "default 0" na coluna cobre as linhas que já existiam no banco.
+     */
+    @Version
+    @Column(nullable = false, columnDefinition = "bigint default 0")
+    private Long versao;
+
     // O objeto de estado não vai para o banco — só o enum "status" vai.
     // É reconstruído sob demanda a partir do status (ver FabricaDeEstados).
     @Transient
@@ -106,7 +126,7 @@ public class Proposta {
     /** Cria uma Proposta RAIZ, em Rascunho. */
     public Proposta(String titulo, String descricao, Usuario autor, Item itemOferecido) {
         if (!itemOferecido.pertenceA(autor)) {
-            throw new IllegalArgumentException("O item " + itemOferecido.getId()
+            throw new RegraNegocioException("ITEM_DE_OUTRO_USUARIO", "O item " + itemOferecido.getId()
                     + " não pertence ao usuário " + autor.getId() + " — só é possível oferecer itens próprios");
         }
         this.titulo = titulo;
@@ -122,14 +142,15 @@ public class Proposta {
      */
     public static Proposta criarContraProposta(String descricao, Usuario autor, Item itemOferecido, Proposta pai) {
         if (pai.isContraProposta()) {
-            throw new IllegalArgumentException("Não é possível contrapropor uma contraproposta — responda à proposta original");
+            throw new RegraNegocioException("CONTRAPROPOSTA_DE_CONTRAPROPOSTA",
+                    "Não é possível contrapropor uma contraproposta — responda à proposta original");
         }
         if (pai.getUsuario().mesmoUsuario(autor)) {
-            throw new IllegalArgumentException("O autor não pode contrapropor a própria proposta");
+            throw new RegraNegocioException("CONTRAPROPOSTA_PARA_SI_MESMO", "O autor não pode contrapropor a própria proposta");
         }
         if (!pai.estadoRaiz().podeReceberContraproposta()) {
-            throw new IllegalStateException("Só propostas Ativas recebem contrapropostas (status atual: "
-                    + pai.getStatus() + ")");
+            throw new TransicaoInvalidaException("PROPOSTA_NAO_RECEBE_CONTRAPROPOSTA",
+                    "Só propostas Ativas recebem contrapropostas (status atual: " + pai.getStatus() + ")");
         }
         Proposta contra = new Proposta(pai.getTitulo(), descricao, autor, itemOferecido);
         contra.propostaPai = pai;
@@ -143,6 +164,8 @@ public class Proposta {
 
     public void mudarEstadoPara(EstadoProposta novoEstado) {
         if (isContraProposta()) {
+            // Defeito de programação (nenhum fluxo do domínio chega aqui): fica
+            // IllegalStateException de propósito e vira 500, não 409.
             throw new IllegalStateException("Contraproposta não usa a máquina de estados da raiz");
         }
         this.estadoRaiz = novoEstado;
@@ -211,7 +234,7 @@ public class Proposta {
     public void desistirDaNegociacao(Usuario quemDesiste) {
         exigirContraproposta("desistir da negociação");
         if (!usuario.mesmoUsuario(quemDesiste) && !propostaPai.getUsuario().mesmoUsuario(quemDesiste)) {
-            throw new AcessoNegadoException("Só as duas partes da negociação podem desistir dela");
+            throw new AcessoNegadoException("PROPOSTA_ACAO_NAO_AUTORIZADA", "Só as duas partes da negociação podem desistir dela");
         }
         estadoContra().irParaRecusado(this);
         propostaPai.estadoRaiz().irParaAtiva(propostaPai);
@@ -241,7 +264,8 @@ public class Proposta {
         Proposta contra = isContraProposta()
                 ? this
                 : raiz.getContrapropostaEmNegociacao().orElseThrow(() ->
-                        new IllegalStateException("Nenhuma contraproposta em negociação para finalizar"));
+                        new TransicaoInvalidaException("PROPOSTA_SEM_NEGOCIACAO",
+                                "Nenhuma contraproposta em negociação para finalizar"));
 
         contra.estadoContra().irParaFinalizado(contra);
         raiz.estadoRaiz().irParaFinalizado(raiz);
@@ -323,19 +347,20 @@ public class Proposta {
 
     private void exigirRaiz(String acao) {
         if (isContraProposta()) {
-            throw new IllegalStateException("Só uma proposta raiz pode " + acao);
+            throw new RegraNegocioException("ACAO_EXCLUSIVA_DA_RAIZ", "Só uma proposta raiz pode " + acao);
         }
     }
 
     private void exigirContraproposta(String acao) {
         if (!isContraProposta()) {
-            throw new IllegalStateException("Só uma contraproposta pode " + acao);
+            throw new RegraNegocioException("ACAO_EXCLUSIVA_DA_CONTRAPROPOSTA", "Só uma contraproposta pode " + acao);
         }
     }
 
     private void exigirDonoDaRaiz(Usuario quem, String acao) {
         if (!propostaPai.getUsuario().mesmoUsuario(quem)) {
-            throw new AcessoNegadoException("Só o dono da proposta original pode " + acao + " uma contraproposta");
+            throw new AcessoNegadoException("PROPOSTA_ACAO_NAO_AUTORIZADA",
+                    "Só o dono da proposta original pode " + acao + " uma contraproposta");
         }
     }
 }

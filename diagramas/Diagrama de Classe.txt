@@ -1,5 +1,7 @@
 @startuml
-' Diagrama de classes — Entrega 2 (Aulas 5 a 9)
+' Diagrama de classes — Entrega 2 (Aulas 5 a 9) + Entrega Final (Aulas 10 a 13)
+' Padrões novos marcados: <<Aula 12>> (herança do Item, Factory Method, @SuperBuilder) e
+' <<Aula 13>> (porta e adaptador da notificação, Decorators de retry e disjuntor).
 ' Getters/setters omitidos para legibilidade: só atributos e métodos de negócio.
 
 skinparam classAttributeIconSize 0
@@ -15,19 +17,45 @@ package "Domínio (Postgres / JPA)" {
     - saldoCreditos: Integer
     - dataCriacao: LocalDateTime
     --
-    + creditar(creditos: int): void
     + mesmoUsuario(outro: Usuario): boolean
   }
 
-  class Item {
+  abstract class Item <<Aula 12 · @SuperBuilder>> {
     - id: Long
     - titulo: String
     - descricao: String
-    - categoria: CategoriaItem
     - usuarioProprietario: Usuario
     - dataCriacao: LocalDateTime
     --
+    + {abstract} getCategoria(): CategoriaItem
+    + {abstract} dadosDoTipo(): DadosDoTipo
+    # {abstract} aplicarDadosDoTipo(dados: DadosDoTipo): void
+    + atualizar(titulo, descricao, dono, dados: DadosDoTipo): void
     + pertenceA(usuario: Usuario): boolean
+  }
+  note top of Item
+    SINGLE_TABLE: tabela "item",
+    discriminador = coluna "categoria"
+  end note
+
+  class ItemProduto <<Aula 12 · PRODUTO>> {
+    - pesoGramas: Integer
+  }
+  class ItemServico <<Aula 12 · SERVICO>> {
+    - duracaoMinutos: Integer
+  }
+  class ItemExperiencia <<Aula 12 · EXPERIENCIA>> {
+    - nivel: NivelExperiencia
+  }
+  enum NivelExperiencia <<Aula 12>> {
+    INICIANTE
+    INTERMEDIARIO
+    AVANCADO
+  }
+  class DadosDoTipo <<record · Aula 12>> {
+    pesoGramas: Integer
+    duracaoMinutos: Integer
+    nivel: NivelExperiencia
   }
 
   enum CategoriaItem {
@@ -46,6 +74,7 @@ package "Domínio (Postgres / JPA)" {
     - propostaPai: Proposta
     - contrapropostas: List<Proposta>
     - dataCriacao: LocalDateTime
+    - versao: Long <<@Version>>
     - estadoRaiz: EstadoProposta <<transient>>
     - estadoContra: EstadoContraproposta <<transient>>
     --
@@ -160,6 +189,7 @@ package "Facade + Observer" {
     - usuarioService: UsuarioService
     - itemService: ItemService
     - eventPublisher: ApplicationEventPublisher
+    - atrasoDemo: AtrasoDemo
     --
     + criarProposta(...): Proposta
     + criarContraproposta(...): Proposta
@@ -192,11 +222,14 @@ package "Facade + Observer" {
   class RegistrarHistoricoListener {
     + aoConcluirTroca(e: TrocaConcluidaEvent)
   }
-  class NotificarUsuariosListener {
+  class NotificarUsuariosListener <<AFTER_COMMIT>> {
     + aoConcluirTroca(e: TrocaConcluidaEvent)
   }
-  class RegistrarLogEventoListener {
+  class RegistrarLogEventoListener <<AFTER_COMMIT>> {
     + aoConcluirTroca(e: TrocaConcluidaEvent)
+  }
+  class RegistrarFinalizacaoRecusadaListener <<AFTER_ROLLBACK>> {
+    + aoDesfazerTroca(e: TrocaConcluidaEvent)
   }
   class AtribuirCreditosListener {
     + aoConcluirTroca(e: TrocaConcluidaEvent)
@@ -251,7 +284,12 @@ package "Adapter (MongoDB)" {
 
 ' ----- Relacionamentos do domínio -----
 Usuario "1" <-- "*" Item : usuarioProprietario
-Item --> CategoriaItem
+ItemProduto --|> Item
+ItemServico --|> Item
+ItemExperiencia --|> Item
+ItemExperiencia --> NivelExperiencia
+Item ..> CategoriaItem : getCategoria()
+Item ..> DadosDoTipo
 Usuario "1" <-- "*" Proposta : autor
 Item "1" <-- "*" Proposta : itemOferecido
 Proposta "0..1" <-- "*" Proposta : propostaPai (contraproposta)
@@ -305,5 +343,125 @@ RegistroDeEventosMongo ..|> RegistroDeEventos
 RegistroDeEventosMongo --> LogEventoRepository
 LogEventoRepository ..> LogEvento
 LogEvento --> NivelLog
+
+package "Exceções de domínio (Aula 11)" {
+  abstract class TrokrException <<sealed>> {
+    - codigo: String
+    + getCodigo(): String
+  }
+  class RecursoNaoEncontradoException <<404>>
+  class TransicaoInvalidaException <<409>>
+  class RegraNegocioException <<422>>
+  class AcessoNegadoException <<403>>
+  class GlobalExceptionHandler <<ProblemDetail>> {
+    + handleDominio(ex: TrokrException): ProblemDetail
+    + handleConcorrencia(ex: OptimisticLockingFailureException): ProblemDetail
+    + handleInesperado(ex: Exception): ProblemDetail
+  }
+}
+
+package "Concorrência (Aula 10)" {
+  class AtrasoDemo <<config>> {
+    - atrasoMs: long
+    + aplicar(): void
+    + getAtrasoMs(): long
+    + {static} dormir(ms: long): void
+  }
+}
+
+package "Notificação: Hexagonal + Decorator (Aula 13)" {
+  interface NotificacaoPort <<Aula 13 · porta>> {
+    + notificar(usuarioId: Long, mensagem: String): void
+  }
+  class NotificacaoSimuladaAdapter <<Aula 13 · adaptador>> {
+    + notificar(usuarioId, mensagem): void
+  }
+  class SimulacaoNotificacao <<Aula 13 · interruptor>> {
+    - foraDoAr: AtomicBoolean
+    + derrubar(): void
+    + religar(): void
+  }
+  class NotificacaoComRetry <<Aula 13 · Decorator>> {
+    - proximo: NotificacaoPort
+    - maxTentativas: int
+    - esperaInicialMs: long
+    + notificar(usuarioId, mensagem): void
+  }
+  class NotificacaoComDisjuntor <<Aula 13 · Decorator>> {
+    - proximo: NotificacaoPort
+    - limiteFalhas: int
+    - tempoAberto: Duration
+    - falhasSeguidas: int
+    - abertoAte: Instant
+    + notificar(usuarioId, mensagem): void
+    - registrarPendente(usuarioId, mensagem): void
+  }
+  class NotificacaoConfig <<Aula 13 · @Configuration>> {
+    + notificacaoPort(...): NotificacaoPort <<@Bean @Primary>>
+  }
+  class DemoNotificacaoController <<Aula 13 · demo>>
+  class NotificacaoIndisponivelException <<técnica>>
+}
+
+interface UsuarioRepository {
+  + adicionarCreditos(id: Long, valor: int): int <<UPDATE atômico>>
+}
+
+RecursoNaoEncontradoException --|> TrokrException
+TransicaoInvalidaException --|> TrokrException
+RegraNegocioException --|> TrokrException
+AcessoNegadoException --|> TrokrException
+GlobalExceptionHandler ..> TrokrException : status por subclasse
+GlobalExceptionHandler --> LogEventoService : só no 500
+EstadoProposta ..> TransicaoInvalidaException : lança
+EstadoContraproposta ..> TransicaoInvalidaException : lança
+
+PropostaService --> AtrasoDemo : janela da corrida
+RegistrarFinalizacaoRecusadaListener ..> TrocaConcluidaEvent : escuta
+RegistrarFinalizacaoRecusadaListener --> LogEventoService : usa
+NotificarUsuariosListener --> NotificacaoPort : só conhece a porta
+NotificacaoSimuladaAdapter ..|> NotificacaoPort
+NotificacaoComRetry ..|> NotificacaoPort
+NotificacaoComDisjuntor ..|> NotificacaoPort
+NotificacaoComRetry o--> NotificacaoPort : proximo (disjuntor)
+NotificacaoComDisjuntor o--> NotificacaoPort : proximo (adaptador)
+NotificacaoComDisjuntor --> LogEventoService : NOTIFICACAO_PENDENTE
+NotificacaoConfig ..> NotificacaoComRetry : monta (por fora)
+NotificacaoConfig ..> NotificacaoComDisjuntor : monta (por dentro)
+NotificacaoSimuladaAdapter --> SimulacaoNotificacao : consulta
+DemoNotificacaoController --> SimulacaoNotificacao : liga/desliga
+NotificacaoSimuladaAdapter ..> NotificacaoIndisponivelException : lança
+AtribuirCreditosListener --> UsuarioRepository : adicionarCreditos
+
+package "Factory Method (Aula 12)" {
+  interface FabricaDeItem <<Aula 12 · Factory Method>> {
+    + categoria(): CategoriaItem
+    + validar(dados: DadosDoTipo): void
+    + criar(dados: ItemRequestDTO, dono: Usuario): Item
+  }
+  class FabricaItemProduto <<Aula 12>>
+  class FabricaItemServico <<Aula 12>>
+  class FabricaItemExperiencia <<Aula 12>>
+  class CatalogoDeFabricas <<Aula 12>> {
+    - fabricas: Map<CategoriaItem, FabricaDeItem>
+    --
+    + criar(dados: ItemRequestDTO, dono: Usuario): Item
+    + validarAtualizacao(existente: Item, dados: ItemRequestDTO): void
+  }
+  class ItemService {
+    + criar(dados: ItemRequestDTO): Item
+    + atualizar(id: Long, dados: ItemRequestDTO): Item
+  }
+}
+
+ItemService --> CatalogoDeFabricas : sem switch, sem new
+CatalogoDeFabricas o--> FabricaDeItem : Map por categoria
+FabricaItemProduto ..|> FabricaDeItem
+FabricaItemServico ..|> FabricaDeItem
+FabricaItemExperiencia ..|> FabricaDeItem
+FabricaItemProduto ..> ItemProduto : builder()
+FabricaItemServico ..> ItemServico : builder()
+FabricaItemExperiencia ..> ItemExperiencia : builder()
+FabricaDeItem ..> RegraNegocioException : 422 ITEM_*
 
 @enduml
