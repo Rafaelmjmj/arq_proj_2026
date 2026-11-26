@@ -146,7 +146,8 @@ public class Proposta {
                     "Não é possível contrapropor uma contraproposta — responda à proposta original");
         }
         if (pai.getUsuario().mesmoUsuario(autor)) {
-            throw new RegraNegocioException("CONTRAPROPOSTA_PARA_SI_MESMO", "O autor não pode contrapropor a própria proposta");
+            throw new RegraNegocioException("CONTRAPROPOSTA_NA_PROPRIA_PROPOSTA",
+                    "O autor não pode fazer contraproposta à própria proposta");
         }
         if (!pai.estadoRaiz().podeReceberContraproposta()) {
             throw new TransicaoInvalidaException("PROPOSTA_NAO_RECEBE_CONTRAPROPOSTA",
@@ -193,6 +194,18 @@ public class Proposta {
         }
     }
 
+    /** Só raiz: Rascunho → Homologação. */
+    public void enviarParaHomologacao() {
+        exigirRaiz("ser enviada para homologação");
+        estadoRaiz().irParaHomologacao(this);
+    }
+
+    /** Só contraproposta: Rascunho → Em Análise. */
+    public void enviarParaAnalise() {
+        exigirContraproposta("ser enviada para análise");
+        estadoContra().irParaEmAnalise(this);
+    }
+
     /** Só raiz: Homologação → Ativa (aprovada pela plataforma). */
     public void aprovar() {
         exigirRaiz("aprovar");
@@ -208,68 +221,130 @@ public class Proposta {
         }
     }
 
+    /** Só raiz: a plataforma recusa a homologação. Homologação → Rascunho (e só a partir dela). */
+    public void recusarHomologacao() {
+        exigirRaiz("ter a homologação recusada");
+        if (status != Status.HOMOLOGACAO) {
+            throw TransicaoInvalidaException.daProposta(
+                    "Só é possível recusar a homologação de uma proposta em HOMOLOGACAO (estado atual: " + status + ")");
+        }
+        estadoRaiz().irParaRascunho(this);
+    }
+
     /**
-     * Só contraproposta: o dono da Proposta original aceita esta
-     * contraproposta. Contra: Em Análise → Negociado; raiz: Ativa → Negociado.
+     * Aceite em duas etapas, como no roteiro de referência. 1ª etapa, só
+     * contraproposta: Em Análise → NEGOCIADO_CONTRA. A raiz ainda fica Ativa até
+     * o dono confirmar com {@link #aceitarContraproposta}. Só uma
+     * contraproposta por vez pode estar aceita.
+     *
+     * @param quemAceita opcional: se informado, precisa ser o dono da raiz (403)
      */
     public void aceitar(Usuario quemAceita) {
         exigirContraproposta("aceitar");
-        exigirDonoDaRaiz(quemAceita, "aceitar");
+        if (quemAceita != null) {
+            exigirDonoDaRaiz(quemAceita, "aceitar");
+        }
+        if (propostaPai.getStatus() != Status.ATIVA) {
+            throw TransicaoInvalidaException.daContraproposta(
+                    "Só é possível aceitar contrapropostas de uma proposta ATIVA (estado atual: " + propostaPai.getStatus() + ")");
+        }
+        if (propostaPai.getContrapropostaEmNegociacao().isPresent()) {
+            throw TransicaoInvalidaException.daContraproposta(
+                    "A proposta " + propostaPai.getId() + " já tem uma contraproposta aceita");
+        }
         estadoContra().irParaNegociado(this);
-        propostaPai.estadoRaiz().irParaNegociado(propostaPai);
+    }
+
+    /**
+     * 2ª etapa, só raiz: o dono confirma a contraproposta aceita.
+     * Ativa → NEGOCIADO_RAIZ. Sem contraproposta aceita, é ação fora de hora (409).
+     *
+     * @param quemAceita opcional: se informado, precisa ser o dono da raiz (403)
+     */
+    public void aceitarContraproposta(Usuario quemAceita) {
+        exigirRaiz("aceitar contraproposta");
+        if (quemAceita != null && !usuario.mesmoUsuario(quemAceita)) {
+            throw new AcessoNegadoException("PROPOSTA_ACAO_NAO_AUTORIZADA",
+                    "Só o dono da proposta pode aceitar uma contraproposta");
+        }
+        if (getContrapropostaEmNegociacao().isEmpty()) {
+            throw TransicaoInvalidaException.daProposta(
+                    "Não há contraproposta aceita para confirmar (estado atual: " + status + ")");
+        }
+        estadoRaiz().irParaNegociado(this);
     }
 
     /** Só contraproposta: o dono da Proposta original recusa. Em Análise → Recusado. */
     public void recusar(Usuario quemRecusa) {
         exigirContraproposta("recusar");
-        exigirDonoDaRaiz(quemRecusa, "recusar");
+        if (quemRecusa != null) {
+            exigirDonoDaRaiz(quemRecusa, "recusar");
+        }
         estadoContra().irParaRecusado(this);
     }
 
     /**
-     * Só contraproposta em negociação: uma das duas partes desiste.
-     * Contra: Negociado → Recusado; raiz: Negociado → Ativa (volta a receber
-     * contrapropostas).
+     * Só contraproposta aceita: uma das duas partes desiste antes da
+     * finalização. Contra: NEGOCIADO_CONTRA → Recusado; se a raiz já estava em
+     * NEGOCIADO_RAIZ, volta para Ativa (volta a receber contrapropostas).
      */
     public void desistirDaNegociacao(Usuario quemDesiste) {
         exigirContraproposta("desistir da negociação");
         if (!usuario.mesmoUsuario(quemDesiste) && !propostaPai.getUsuario().mesmoUsuario(quemDesiste)) {
             throw new AcessoNegadoException("PROPOSTA_ACAO_NAO_AUTORIZADA", "Só as duas partes da negociação podem desistir dela");
         }
+        if (propostaPai.getStatus() == Status.FINALIZADA) {
+            throw TransicaoInvalidaException.daContraproposta("A troca já foi FINALIZADA: não é possível desistir");
+        }
+        if (status != Status.NEGOCIADO_CONTRA) {
+            throw TransicaoInvalidaException.daContraproposta(
+                    "Só é possível desistir de uma contraproposta aceita (estado atual: " + status + ")");
+        }
         estadoContra().irParaRecusado(this);
-        propostaPai.estadoRaiz().irParaAtiva(propostaPai);
-    }
-
-    /**
-     * Cancela. Numa raiz, dispara o efeito cascata: as contrapropostas ainda
-     * abertas são encerradas (cada estado decide como).
-     */
-    public void cancelar() {
-        if (isContraProposta()) {
-            estadoContra().irParaCancelado(this);
-        } else {
-            estadoRaiz().irParaCancelado(this);
-            encerrarContrapropostas();
+        if (propostaPai.getStatus() == Status.NEGOCIADO_RAIZ) {
+            propostaPai.estadoRaiz().irParaAtiva(propostaPai);
         }
     }
 
     /**
-     * Finaliza a troca — pode ser chamado a partir da raiz (Cenário A) ou da
-     * contraproposta em negociação (Cenário B). Nos dois casos:
-     * contraproposta → Finalizado, raiz → Finalizado e as concorrentes que
-     * ainda estavam abertas são encerradas (efeito cascata).
+     * Cancela. Contraproposta: exige justificativa (422 JUSTIFICATIVA_OBRIGATORIA).
+     * Raiz: justificativa opcional, e dispara o efeito cascata — as
+     * contrapropostas ainda abertas são encerradas (cada estado decide como).
+     */
+    public void cancelar(String justificativa) {
+        if (isContraProposta()) {
+            if (justificativa == null || justificativa.isBlank()) {
+                throw new RegraNegocioException("JUSTIFICATIVA_OBRIGATORIA",
+                        "Para cancelar uma contraproposta, informe a justificativa");
+            }
+            estadoContra().irParaCancelado(this);
+        } else {
+            estadoRaiz().irParaCancelado(this);
+            encerrarContrapropostas(null);
+        }
+    }
+
+    /**
+     * Finaliza a troca — chamado a partir da raiz (ou da contraproposta aceita,
+     * que repassa para a raiz). A raiz precisa estar em NEGOCIADO_RAIZ; fora
+     * disso, 409 citando o estado atual. Raiz → FINALIZADA; a contraproposta
+     * vencedora continua em NEGOCIADO_CONTRA; as concorrentes ainda abertas são
+     * encerradas (efeito cascata).
      */
     public void finalizar() {
+        if (isContraProposta() && status != Status.NEGOCIADO_CONTRA) {
+            throw TransicaoInvalidaException.daContraproposta(
+                    "Só a contraproposta aceita finaliza a troca (estado atual: " + status + ")");
+        }
         Proposta raiz = getRaiz();
-        Proposta contra = isContraProposta()
-                ? this
-                : raiz.getContrapropostaEmNegociacao().orElseThrow(() ->
-                        new TransicaoInvalidaException("PROPOSTA_SEM_NEGOCIACAO",
-                                "Nenhuma contraproposta em negociação para finalizar"));
-
-        contra.estadoContra().irParaFinalizado(contra);
+        if (raiz.getStatus() != Status.NEGOCIADO_RAIZ) {
+            throw TransicaoInvalidaException.daProposta(
+                    "Não é possível finalizar uma proposta no estado " + raiz.getStatus());
+        }
+        Proposta vencedora = raiz.getContrapropostaEmNegociacao().orElseThrow(() ->
+                TransicaoInvalidaException.daProposta("Nenhuma contraproposta aceita para finalizar"));
         raiz.estadoRaiz().irParaFinalizado(raiz);
-        raiz.encerrarContrapropostas();
+        raiz.encerrarContrapropostas(vencedora);
     }
 
     // =====================================================================
@@ -292,7 +367,7 @@ public class Proposta {
 
     /** true quando a negociação chegou ao estado final de troca realizada. */
     public boolean isTrocaConcluida() {
-        return getRaiz().getStatus() == Status.FINALIZADO;
+        return getRaiz().getStatus() == Status.FINALIZADA;
     }
 
     public List<Proposta> getContrapropostas() {
@@ -304,9 +379,11 @@ public class Proposta {
         return buscarContrapropostaPorStatus(Status.NEGOCIADO_CONTRA);
     }
 
-    /** A contraproposta que fechou a troca, depois de finalizada. */
+    /** A contraproposta que fechou a troca: a aceita, depois que a raiz foi FINALIZADA. */
     public Optional<Proposta> getContrapropostaVencedora() {
-        return buscarContrapropostaPorStatus(Status.FINALIZADO_CONTRA);
+        return getRaiz().getStatus() == Status.FINALIZADA
+                ? buscarContrapropostaPorStatus(Status.NEGOCIADO_CONTRA)
+                : Optional.empty();
     }
 
     // =====================================================================
@@ -326,9 +403,11 @@ public class Proposta {
         return contrapropostas.stream().filter(c -> c.getStatus() == status).findFirst();
     }
 
-    /** Efeito cascata: pede para cada contraproposta se encerrar. */
-    protected void encerrarContrapropostas() {
-        contrapropostas.forEach(c -> c.estadoContra().encerrarPorFimDaRaiz(c));
+    /** Efeito cascata: pede para cada contraproposta (menos a vencedora, se houver) se encerrar. */
+    protected void encerrarContrapropostas(Proposta vencedora) {
+        contrapropostas.stream()
+                .filter(c -> c != vencedora)
+                .forEach(c -> c.estadoContra().encerrarPorFimDaRaiz(c));
     }
 
     protected EstadoProposta estadoRaiz() {
@@ -345,15 +424,18 @@ public class Proposta {
         return estadoContra;
     }
 
+    /** Ação da máquina errada é ação fora de hora: 409, como no roteiro de referência (CT-C04). */
     private void exigirRaiz(String acao) {
         if (isContraProposta()) {
-            throw new RegraNegocioException("ACAO_EXCLUSIVA_DA_RAIZ", "Só uma proposta raiz pode " + acao);
+            throw TransicaoInvalidaException.daProposta("Só uma proposta raiz pode " + acao
+                    + " — esta é uma contraproposta (estado " + status + ")");
         }
     }
 
     private void exigirContraproposta(String acao) {
         if (!isContraProposta()) {
-            throw new RegraNegocioException("ACAO_EXCLUSIVA_DA_CONTRAPROPOSTA", "Só uma contraproposta pode " + acao);
+            throw TransicaoInvalidaException.daProposta("Só uma contraproposta pode " + acao
+                    + " — esta é uma proposta raiz (estado " + status + ")");
         }
     }
 

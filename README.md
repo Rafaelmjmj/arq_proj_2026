@@ -8,12 +8,53 @@ que oferecem e propõem trocas entre si, sem dinheiro envolvido.
 > projeto Maven, nomes de containers/banco no Docker) — não está espalhado
 > pela lógica de negócio.
 
+## Roteiro de Testes do professor (Entrega Final)
+
+O professor distribuiu o **Roteiro de Testes de Aceitação do Trokr**, que será
+usado na arguição. O Trokr segue o contrato dele: rotas, status HTTP, estados
+da proposta, saldos, `application/problem+json` e tipos de log.
+
+```bash
+docker compose down -v
+TROKR_DEMO_ENDPOINTS=true docker compose up --build -d   # Windows: $env:TROKR_DEMO_ENDPOINTS="true"; docker compose up --build -d
+```
+
+- **Blocos 0 a 6 e 9:** pelo Swagger, em http://localhost:8090/swagger-ui.html.
+- **Bloco 7 (concorrência):** `./cenario-final.sh`, depois `./corrida.sh {N1}` e
+  `./corrida.sh {N2} {N3}`. Os dois scripts são os do Apêndice A do roteiro e
+  precisam do `jq` (`sudo apt install jq`). Para o 409 vir do `@Version`, suba
+  com `TROKR_ATRASO_MS=2000` (no projeto de referência: `TROKR_DEMO_ATRASOMS`).
+- **Bloco 8 (erros de protocolo):** `curl -i` como no roteiro.
+
+**Fluxo da proposta**, como no roteiro: `POST /propostas` → `POST /{id}/enviar-homologacao`
+→ `POST /{id}/aprovar` → `POST /{id}/contrapropostas` → `POST /{contra}/enviar`
+→ `POST /{contra}/aceitar` → `POST /{raiz}/aceitar-contraproposta` → `PATCH /{raiz}/finalizar`.
+O aceite tem duas etapas, e a contraproposta vencedora continua em
+`NEGOCIADO_CONTRA` depois da finalização.
+
+**Diferenças em relação ao projeto de referência** (o roteiro pede que fiquem
+anotadas aqui):
+
+| Ponto | Projeto de referência | Trokr |
+|---|---|---|
+| Campos específicos do item | dentro de `detalhes` | no próprio JSON (`pesoGramas`, `duracaoMinutos`, `nivel`), só o do tipo |
+| Variável do atraso da Aula 10 | `TROKR_DEMO_ATRASOMS` | `TROKR_ATRASO_MS` |
+| Ação errada na máquina da contraproposta | `PROPOSTA_TRANSICAO_INVALIDA` | `CONTRAPROPOSTA_TRANSICAO_INVALIDA` (409, mesmo significado) |
+| Quem age (`?usuarioId=`) | não existe | opcional em aceitar, aceitar-contraproposta, recusar e avaliar; se informado e não for a pessoa certa, 403 |
+| Códigos a mais | — | `AVALIACAO_AUTOR_INVALIDO` e `PROPOSTA_ACAO_NAO_AUTORIZADA` (403), `RESTRICAO_DE_INTEGRIDADE` (409), `ERRO_INTERNO` (500), `MIDIA_NAO_SUPORTADA` (415) |
+| Log a mais | — | `FINALIZACAO_RECUSADA` (AFTER_ROLLBACK, Aula 10) |
+| Campos a mais na proposta | — | `tipo`, `podeMudar`, `propostaPaiId` (igual a `propostaAnteriorId`) |
+| Usuário | — | aceita também `cidade` (opcional) |
+
+O registro de falhas do Apêndice C e o guia de estudo para a arguição estão em
+[`ROTEIRO_DE_TESTES.md`](ROTEIRO_DE_TESTES.md).
+
 ## Entrega 2 — onde está cada padrão
 
 | Padrão | Onde está | O que mostrar na arguição |
 |---|---|---|
 | **Domain Model rico** | `model/Proposta`, `model/Avaliacao`, `model/Usuario` | Não há `setStatus()`: o status só muda por métodos de negócio (`submeter`, `aceitar`, `finalizar`...). Regras como "só o dono da raiz aceita" e "só propostas Ativas recebem contraproposta" moram na entidade. |
-| **State** (Opção A) | `model/state/proposta` (6 estados da raiz) e `model/state/contraproposta` (6 da contraproposta) | Duas interfaces independentes. Cada estado decide as próprias transições e lança `IllegalStateException` (HTTP 409) para as inválidas. O efeito cascata (`encerrarPorFimDaRaiz`) também é decidido por cada estado. |
+| **State** (Opção A) | `model/state/proposta` (6 estados da raiz) e `model/state/contraproposta` (6 da contraproposta) | Duas interfaces independentes. Cada estado decide as próprias transições e lança `TransicaoInvalidaException` (HTTP 409) para as inválidas. O efeito cascata (`encerrarPorFimDaRaiz`) também é decidido por cada estado. |
 | **Observer** | `event/TrocaConcluidaEvent` + `listener/*` (5 listeners) | O `PropostaService` só publica o evento, e somente quando a troca chega ao estado final. Os listeners não se conhecem: incluir um sexto não mexe em nada que já existe. |
 | **Adapter** | `adapter/RegistroDeEventos` (porta) + `adapter/mongo/RegistroDeEventosMongo` (adaptador) | O `LogEventoService` depende só da interface. O documento Mongo (`LogEvento`) nunca sai do pacote do adaptador. |
 | **Strategy** | `strategy/EstrategiaCredito` + `CreditoProduto`, `CreditoServico`, `CreditoExperiencia`; contexto em `service/CalculadoraCreditoService` | Um `Map<CategoriaItem, EstrategiaCredito>` montado pelo Spring, sem nenhum switch por categoria. Cada estratégia tem teste unitário próprio, sem Spring. |
@@ -26,13 +67,18 @@ Diagramas: `diagramas/DiagramaDePadroesEntrega2.png` (visão da Entrega 2),
 `DiagramaDeClasseV2.png` (completo) e os dois diagramas de estado V2. Os
 fontes PlantUML são os `.txt` da mesma pasta.
 
+Sequência: `DiagramaDeSequenciaV1.png` é o ciclo da proposta (Entrega 1);
+`DiagramaDeSequenciaFinalizacaoV2.png` (fonte Mermaid no `.mmd`) é a finalização
+como o código faz hoje (Facade, State, Observer, `@Version`, AFTER_COMMIT,
+retry e disjuntor).
+
 ### Roteiro de teste (Aula 9)
 
 Importe `COLLECTION_INSOMNIA.json` e rode a pasta **"0. Roteiro Aula 9"** em
 ordem, com o banco zerado (`docker compose down -v` e depois
 `docker compose up --build`). Os passos marcados "ERRO esperado" precisam
 falhar. Ao fim, `GET /usuarios` mostra A = 10 e B = 15 créditos, e existem
-2 avaliações pendentes, 1 histórico e 1 log `TROCA_CONCLUIDA`.
+2 avaliações pendentes, 1 histórico e 1 log `INFO_GERAL` (troca concluída).
 
 ### Testes unitários
 
@@ -85,7 +131,7 @@ estado conferir e a Proposta ser gravada.
 2. `./preparar-cenario.sh` cria três usuários e duas negociações em Negociado
    com o usuário A em comum, e imprime os comandos prontos.
 3. `./corrida.sh <raiz1>` deve dar **200 e 409**, com duas avaliações, um
-   histórico, crédito uma vez só, um `TROCA_CONCLUIDA` em `GET /logs` e duas
+   histórico, crédito uma vez só, um `INFO_GERAL` em `GET /logs` e duas
    notificações.
 4. Rode `./preparar-cenario.sh` de novo e então `./corrida.sh <raiz1> <raiz2>`:
    deve dar **200 e 200**, com o saldo de A igual a 20 (10 + 10).
@@ -166,18 +212,16 @@ exceções do Spring MVC como ProblemDetail.
 | `ITEM_NAO_ENCONTRADO` | 404 | item inexistente |
 | `PROPOSTA_NAO_ENCONTRADA` | 404 | proposta inexistente |
 | `AVALIACAO_NAO_ENCONTRADA` | 404 | avaliação inexistente |
-| `PROPOSTA_TRANSICAO_INVALIDA` | 409 | a máquina da raiz não permite a ação |
+| `PROPOSTA_TRANSICAO_INVALIDA` | 409 | a máquina da raiz não permite a ação, ou ação da máquina errada (ex.: aprovar uma contraproposta) |
 | `CONTRAPROPOSTA_TRANSICAO_INVALIDA` | 409 | a máquina da contraproposta não permite a ação |
 | `PROPOSTA_NAO_RECEBE_CONTRAPROPOSTA` | 409 | contraproposta para uma proposta que não está Ativa |
-| `PROPOSTA_SEM_NEGOCIACAO` | 409 | finalizar uma raiz sem contraproposta em negociação |
-| `AVALIACAO_JA_PREENCHIDA` | 409 | avaliar de novo |
 | `PROPOSTA_ALTERADA_CONCORRENTEMENTE` | 409 | perdeu a corrida para outra requisição (`@Version`) |
 | `RESTRICAO_DE_INTEGRIDADE` | 409 | restrição do banco (ex.: remover item em uso) |
 | `ITEM_DE_OUTRO_USUARIO` | 422 | oferecer item que não é seu |
-| `CONTRAPROPOSTA_PARA_SI_MESMO` | 422 | contrapropor a própria proposta |
+| `CONTRAPROPOSTA_NA_PROPRIA_PROPOSTA` | 422 | contrapropor a própria proposta |
 | `CONTRAPROPOSTA_DE_CONTRAPROPOSTA` | 422 | contrapropor uma contraproposta |
-| `ACAO_EXCLUSIVA_DA_RAIZ` | 422 | aprovar uma contraproposta |
-| `ACAO_EXCLUSIVA_DA_CONTRAPROPOSTA` | 422 | aceitar, recusar ou desistir numa raiz |
+| `JUSTIFICATIVA_OBRIGATORIA` | 422 | cancelar contraproposta sem justificativa |
+| `AVALIACAO_JA_REALIZADA` | 422 | avaliar de novo |
 | `AVALIACAO_NOTA_INVALIDA` | 422 | nota fora de 1 a 5 |
 | `EMAIL_JA_CADASTRADO` | 422 | e-mail já usado por outro usuário |
 | `ITEM_DADOS_INCOMPLETOS` | 422 | item sem o campo do seu tipo (Aula 12) |
@@ -186,6 +230,9 @@ exceções do Spring MVC como ProblemDetail.
 | `PROPOSTA_ACAO_NAO_AUTORIZADA` | 403 | aceitar, recusar ou desistir sem ser parte |
 | `AVALIACAO_AUTOR_INVALIDO` | 403 | preencher a avaliação de outra pessoa |
 | `VALIDACAO` | 400 | campos inválidos (lista em `campos`) |
+| `REQUISICAO_INVALIDA` | 400 | JSON malformado, enum inexistente, tipo errado na URL |
+| `ROTA_NAO_ENCONTRADA` | 404 | caminho que não existe na API |
+| `METODO_NAO_SUPORTADO` | 405 | método HTTP não aceito no caminho |
 | `ERRO_INTERNO` | 500 | defeito; informe a `ocorrencia` ao suporte |
 
 ### Notificação com falha e retry
@@ -330,7 +377,7 @@ Diagramas: `diagramas/DiagramaNotificacaoAula13.png` (visão focada) e
 
 ### Como demonstrar (passo 8 da aula)
 
-1. `./preparar-cenario.sh`: ele deixa duas negociações em NEGOCIADO (Raiz 1 e Raiz 2).
+1. `./preparar-cenario.sh`: ele deixa duas negociações em NEGOCIADO_RAIZ (Raiz 1 e Raiz 2). O roteiro do professor faz o mesmo com o `cenario-final.sh` (N4 a N7).
 2. `curl -X PATCH localhost:8090/demo/notificacao/fora-do-ar` (ou pelo Swagger, grupo "Demonstração").
 3. `PATCH /propostas/{Raiz 1}/finalizar`: pessoa A, tentativas 1, 2 e 3 falham → falha definitiva;
    pessoa B, tentativas 4 e 5 falham → **"Disjuntor ABERTO"**, a 3ª vira pendente.
@@ -375,9 +422,9 @@ ganha proxy. Por isso as camadas da notificação, montadas com `new` na
   endpoints de demonstração.
 
 **Uma troca inteira pelo navegador**: no grupo Propostas, na ordem do
-`preparar-cenario.sh` (criar, `/submeter`, `/aprovar`, contrapropor,
-submeter a contraproposta, `/aceitar`, `/finalizar`). Finalizar de novo
-responde 409 com `application/problem+json`.
+roteiro do professor (criar, `/enviar-homologacao`, `/aprovar`, contrapropor,
+`/enviar`, `/aceitar`, `/aceitar-contraproposta`, `/finalizar`). Finalizar de
+novo responde 409 com `application/problem+json`.
 
 ### ADRs
 
@@ -392,7 +439,7 @@ Alternativas consideradas, Decisão, Consequências):
 | [0004](docs/adr/0004-heranca-de-item-em-single-table.md) | Herança de Item em SINGLE_TABLE |
 | [0005](docs/adr/0005-monolito-modular.md) | Monolito modular em vez de microsserviços |
 
-Roteiro completo de testes, com as respostas esperadas e as perguntas prováveis: [`ROTEIRO_DE_TESTES.md`](ROTEIRO_DE_TESTES.md).
+Guia de testes (complemento do roteiro do professor), registro de falhas e perguntas prováveis: [`ROTEIRO_DE_TESTES.md`](ROTEIRO_DE_TESTES.md).
 
 ## Stack e decisões da Aula 1
 
@@ -653,18 +700,21 @@ ProblemDetail descrito em [Contrato de erro](#entrega-final--aula-11-contrato-de
 | GET | `/propostas` (`?apenasRaizes=true`) | Lista propostas |
 | GET | `/propostas/{id}` | Busca uma proposta |
 | GET | `/propostas/{id}/contrapropostas` | Contrapropostas concorrentes de uma raiz |
-| POST | `/propostas` | Cria proposta raiz `{titulo, descricao, usuarioId, itemId}` |
-| POST | `/propostas/{id}/contrapropostas` | Contrapropõe `{descricao, usuarioId, itemId}` |
-| PATCH | `/propostas/{id}/submeter` | Raiz → Homologação · Contra → Em Análise |
-| PATCH | `/propostas/{id}/aprovar` | Raiz: Homologação → Ativa |
-| PATCH | `/propostas/{id}/editar` | Volta para Rascunho |
-| PATCH | `/propostas/{id}/aceitar?usuarioId=` | Dono da raiz aceita a contraproposta |
-| PATCH | `/propostas/{id}/recusar?usuarioId=` | Dono da raiz recusa a contraproposta em análise |
-| PATCH | `/propostas/{id}/desistir?usuarioId=` | Uma das partes desiste da negociação |
-| PATCH | `/propostas/{id}/cancelar` | Cancela (a raiz leva as contrapropostas junto) |
-| PATCH | `/propostas/{id}/finalizar` | Conclui a troca e dispara o `TrocaConcluidaEvent` |
+| POST | `/propostas` | Cria proposta raiz `{usuarioId, itemId}` (+ `titulo`, `descricao` opcionais) |
+| POST | `/propostas/{id}/contrapropostas` | Contrapropõe `{usuarioId, itemId}` (+ `descricao` opcional) |
+| POST | `/propostas/{id}/enviar-homologacao` | Raiz: RASCUNHO → HOMOLOGACAO |
+| POST | `/propostas/{id}/recusar-homologacao` | Raiz: HOMOLOGACAO → RASCUNHO |
+| POST | `/propostas/{id}/aprovar` | Raiz: HOMOLOGACAO → ATIVA |
+| POST | `/propostas/{id}/editar` | Volta para RASCUNHO |
+| POST | `/propostas/{id}/enviar` | Contra: RASCUNHO → EM_ANALISE |
+| POST | `/propostas/{id}/aceitar` (`?usuarioId=` opcional) | Contra: EM_ANALISE → NEGOCIADO_CONTRA (1ª etapa) |
+| POST | `/propostas/{id}/aceitar-contraproposta` (`?usuarioId=` opcional) | Raiz: ATIVA → NEGOCIADO_RAIZ (2ª etapa) |
+| POST | `/propostas/{id}/recusar` (`?usuarioId=` opcional) | Contra em análise → RECUSADO |
+| POST | `/propostas/{id}/desistir?usuarioId=` | Uma das partes desiste da negociação |
+| POST | `/propostas/{id}/cancelar` | Cancela `{justificativa}` (obrigatória na contraproposta; a raiz leva as contrapropostas junto) |
+| PATCH | `/propostas/{id}/finalizar` | Raiz → FINALIZADA e dispara o `TrocaConcluidaEvent` |
 | GET | `/avaliacoes` (`?propostaId=`, `?usuarioAlvoId=`) | Lista avaliações |
-| PATCH | `/avaliacoes/{id}` | Preenche `{usuarioId, nota, descricao}` |
+| PATCH | `/avaliacoes/{id}` | Preenche `{nota, descricao}` (+ `usuarioId` opcional) |
 | GET | `/historicos?propostaId=` | Histórico de uma proposta |
 | GET | `/logs?tipo=` · `/logs/nivel?nivel=ERROR&horas=24` | LogEvento no Mongo |
 
@@ -672,7 +722,7 @@ Todos os erros seguem o [contrato de erro](#entrega-final--aula-11-contrato-de-e
 ProblemDetail com `status`, `codigo` estável e `detail`.
 
 Ferramentas de aula: `GET /demo/erro-inesperado` força um 500 (Aula 11);
-`preparar-cenario.sh` e `corrida.sh` reproduzem as corridas (Aula 10).
+`cenario-final.sh` (do professor), `preparar-cenario.sh` e `corrida.sh` reproduzem as corridas (Aula 10).
 
 ## Testando a API
 

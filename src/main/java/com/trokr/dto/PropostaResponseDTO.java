@@ -21,7 +21,10 @@ public record PropostaResponseDTO(
         String itemTitulo,
         String itemCategoria,
         Long propostaPaiId,
-        LocalDateTime dataCriacao
+        LocalDateTime dataCriacao,
+        boolean raiz,
+        Long propostaAnteriorId,
+        Long versao
 ) {
 
     public static PropostaResponseDTO fromEntity(Proposta proposta) {
@@ -38,7 +41,10 @@ public record PropostaResponseDTO(
                 proposta.getItemOferecido().getTitulo(),
                 proposta.getItemOferecido().getCategoria().name(),
                 proposta.isContraProposta() ? proposta.getPropostaPai().getId() : null,
-                proposta.getDataCriacao()
+                proposta.getDataCriacao(),
+                !proposta.isContraProposta(),
+                proposta.isContraProposta() ? proposta.getPropostaPai().getId() : null,
+                proposta.getVersao()
         );
     }
 }

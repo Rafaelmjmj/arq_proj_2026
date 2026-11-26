@@ -13,7 +13,7 @@ import org.springframework.data.mongodb.core.mapping.Document;
  * Log genérico do sistema, gravado como DOCUMENTO no MongoDB (Aula 8).
  *
  * Genérico de propósito: não é "log de troca", é log de qualquer coisa.
- * O {@code payload} não tem schema fixo — um TROCA_CONCLUIDA guarda ids de
+ * O {@code payload} não tem schema fixo — um INFO_GERAL guarda ids de
  * usuários e itens; um ERRO_SISTEMA guarda a exceção. Mesma coleção, sem
  * migração e sem colunas nulas.
  *

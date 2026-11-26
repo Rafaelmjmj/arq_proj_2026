@@ -13,8 +13,7 @@ import jakarta.validation.constraints.Size;
  */
 public record AvaliarRequestDTO(
 
-        @Schema(description = "Autor da avaliação (quem preenche)", example = "1")
-        @NotNull(message = "usuarioId é obrigatório")
+        @Schema(description = "Opcional: autor da avaliação. Se informado, precisa ser o autor (403)", example = "1")
         Long usuarioId,
 
         @Schema(description = "De 1 a 5", example = "5")

@@ -96,7 +96,11 @@ public class PropostaService {
     public Proposta criarProposta(String titulo, String descricao, Long usuarioId, Long itemId) {
         Usuario autor = usuarioService.buscarPorId(usuarioId);
         Item item = itemService.buscarPorId(itemId);
-        return propostaRepository.save(new Proposta(titulo, descricao, autor, item));
+        // Título e descrição são opcionais (o roteiro de referência cria a proposta só
+        // com usuarioId e itemId): sem eles, o título vem do item oferecido.
+        String tituloFinal = (titulo == null || titulo.isBlank()) ? "Troca: " + item.getTitulo() : titulo;
+        String descricaoFinal = descricao == null ? "" : descricao;
+        return propostaRepository.save(new Proposta(tituloFinal, descricaoFinal, autor, item));
     }
 
     @Transactional
@@ -104,7 +108,8 @@ public class PropostaService {
         Proposta raiz = buscarPorId(propostaId);
         Usuario autor = usuarioService.buscarPorId(usuarioId);
         Item item = itemService.buscarPorId(itemId);
-        return propostaRepository.save(Proposta.criarContraProposta(descricao, autor, item, raiz));
+        String descricaoFinal = (descricao == null || descricao.isBlank()) ? "Ofereço: " + item.getTitulo() : descricao;
+        return propostaRepository.save(Proposta.criarContraProposta(descricaoFinal, autor, item, raiz));
     }
 
     // =====================================================================
@@ -115,6 +120,20 @@ public class PropostaService {
     public Proposta submeter(Long id) {
         Proposta proposta = buscarPorId(id);
         proposta.submeter();
+        return propostaRepository.save(proposta);
+    }
+
+    @Transactional
+    public Proposta enviarParaHomologacao(Long id) {
+        Proposta proposta = buscarPorId(id);
+        proposta.enviarParaHomologacao();
+        return propostaRepository.save(proposta);
+    }
+
+    @Transactional
+    public Proposta enviarParaAnalise(Long id) {
+        Proposta proposta = buscarPorId(id);
+        proposta.enviarParaAnalise();
         return propostaRepository.save(proposta);
     }
 
@@ -133,16 +152,37 @@ public class PropostaService {
     }
 
     @Transactional
+    public Proposta recusarHomologacao(Long id) {
+        Proposta proposta = buscarPorId(id);
+        proposta.recusarHomologacao();
+        return propostaRepository.save(proposta);
+    }
+
+    /** 1ª etapa do aceite: a contraproposta vai para NEGOCIADO_CONTRA. */
+    @Transactional
     public Proposta aceitar(Long contrapropostaId, Long usuarioId) {
         Proposta contraproposta = buscarPorId(contrapropostaId);
-        contraproposta.aceitar(usuarioService.buscarPorId(usuarioId));
+        contraproposta.aceitar(usuarioOpcional(usuarioId));
         return propostaRepository.save(contraproposta);
+    }
+
+    /** 2ª etapa do aceite: a raiz confirma e vai para NEGOCIADO_RAIZ. */
+    @Transactional
+    public Proposta aceitarContraproposta(Long raizId, Long usuarioId) {
+        Proposta raiz = buscarPorId(raizId);
+        raiz.aceitarContraproposta(usuarioOpcional(usuarioId));
+        return propostaRepository.save(raiz);
+    }
+
+    /** Quem age é opcional (ainda não há login): sem ele, a checagem de autoria é pulada. */
+    private Usuario usuarioOpcional(Long usuarioId) {
+        return usuarioId == null ? null : usuarioService.buscarPorId(usuarioId);
     }
 
     @Transactional
     public Proposta recusar(Long contrapropostaId, Long usuarioId) {
         Proposta contraproposta = buscarPorId(contrapropostaId);
-        contraproposta.recusar(usuarioService.buscarPorId(usuarioId));
+        contraproposta.recusar(usuarioOpcional(usuarioId));
         return propostaRepository.save(contraproposta);
     }
 
@@ -154,9 +194,9 @@ public class PropostaService {
     }
 
     @Transactional
-    public Proposta cancelar(Long id) {
+    public Proposta cancelar(Long id, String justificativa) {
         Proposta proposta = buscarPorId(id);
-        proposta.cancelar();
+        proposta.cancelar(justificativa);
         return propostaRepository.save(proposta);
     }
 

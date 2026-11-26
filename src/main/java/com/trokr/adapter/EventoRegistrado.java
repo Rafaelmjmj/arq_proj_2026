@@ -9,7 +9,7 @@ import java.util.Map;
  * porta nunca vê o documento do Mongo ({@code LogEvento}).
  *
  * @param id        gerado pelo armazenamento (null antes de registrar)
- * @param tipo      ex.: TROCA_CONCLUIDA, TRANSICAO_INVALIDA, ERRO_SISTEMA
+ * @param tipo      ex.: INFO_GERAL, TRANSICAO_INVALIDA, ERRO_SISTEMA
  * @param payload   dados específicos do tipo, sem schema fixo
  * @param usuarioId opcional — nem todo evento tem usuário associado
  */

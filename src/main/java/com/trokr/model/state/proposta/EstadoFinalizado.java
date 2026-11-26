@@ -10,7 +10,7 @@ import com.trokr.model.Status;
  */
 public class EstadoFinalizado implements EstadoProposta {
 
-    private static final String TRANSICAO_INVALIDA = "Transição inválida: Finalizado → ";
+    private static final String TRANSICAO_INVALIDA = "Transição inválida: FINALIZADA → ";
 
     @Override
     public void irParaRascunho(Proposta proposta) {
@@ -34,7 +34,7 @@ public class EstadoFinalizado implements EstadoProposta {
 
     @Override
     public void irParaFinalizado(Proposta proposta) {
-        throw TransicaoInvalidaException.daProposta("A proposta já está como Finalizado. Transição inválida!");
+        throw TransicaoInvalidaException.daProposta("A proposta já está FINALIZADA. Transição inválida!");
     }
 
     @Override
@@ -49,6 +49,6 @@ public class EstadoFinalizado implements EstadoProposta {
 
     @Override
     public Status getStatus() {
-        return Status.FINALIZADO;
+        return Status.FINALIZADA;
     }
 }

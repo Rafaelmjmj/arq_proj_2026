@@ -2,7 +2,6 @@ package com.trokr.model;
 
 import com.trokr.exception.AcessoNegadoException;
 import com.trokr.exception.RegraNegocioException;
-import com.trokr.exception.TransicaoInvalidaException;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -88,9 +87,9 @@ public class Avaliacao {
      */
     public void avaliar(Usuario quemAvalia, int nota, String descricao) {
         if (status != StatusAvaliacao.PENDENTE) {
-            throw new TransicaoInvalidaException("AVALIACAO_JA_PREENCHIDA", "Esta avaliação já foi preenchida");
+            throw new RegraNegocioException("AVALIACAO_JA_REALIZADA", "Esta avaliação já foi realizada (nota " + this.nota + ")");
         }
-        if (!usuarioAutor.mesmoUsuario(quemAvalia)) {
+        if (quemAvalia != null && !usuarioAutor.mesmoUsuario(quemAvalia)) {
             throw new AcessoNegadoException("AVALIACAO_AUTOR_INVALIDO",
                     "Só o autor da avaliação pode preenchê-la — não é possível avaliar em nome de outra pessoa");
         }

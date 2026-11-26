@@ -1,429 +1,85 @@
-# Roteiro de testes — Trokr, Entrega Final
+# Guia de testes e arguição — Trokr, Entrega Final
 
-Tudo pensado para o **terminal do Ubuntu**. Cada passo traz o comando, o que
-deve aparecer, e o que significa se aparecer outra coisa. No fim há as
-perguntas que o professor provavelmente fará, com a resposta curta e o
-arquivo onde está o código.
-
-> Nos exemplos, `RAIZ_1`, `RAIZ_2`, `ID_A` etc. são os ids que o
-> `preparar-cenario.sh` imprime. Os seus números serão outros.
+O **roteiro oficial** é o do professor (*Roteiro de Testes de Aceitação do
+Trokr*), que será usado no dia da arguição. Este guia complementa: diz onde
+cada bloco do roteiro mexe no código, o que conferir com atenção, o registro
+de falhas (Apêndice C) já preenchido e as perguntas prováveis.
 
 ---
 
-## 0. Preparar o terminal (uma vez)
-
-Cole isto no terminal. Cria um atalho `api` que mostra a resposta **e** o
-status HTTP de cada chamada:
+## 1. Antes de começar
 
 ```bash
-B=http://localhost:8090
-api() { curl -s -w '\n→ HTTP %{http_code}\n' -H 'Content-Type: application/json' "$@"; echo; }
+cd ~/arq_proj_2026
+docker compose down -v                                   # banco vazio: ids e saldos do roteiro dependem disso
+TROKR_DEMO_ENDPOINTS=true docker compose up --build -d   # Windows: $env:TROKR_DEMO_ENDPOINTS="true"; docker compose up --build -d
+docker compose logs -f app                               # esperar "Started TrokrApplication"; Ctrl+C
+sudo apt install -y jq                                   # os scripts do Bloco 7 usam o jq
+chmod +x cenario-final.sh corrida.sh
 ```
+
+- Swagger: **http://localhost:8090/swagger-ui.html**
+- Rode os casos **na ordem** do roteiro: os ids esperados (1, 2, 3...) só batem assim.
+- Para o Bloco 7 com o 409 vindo do `@Version`: `TROKR_ATRASO_MS=2000 TROKR_DEMO_ENDPOINTS=true docker compose up -d`
+  (sem `--build`: só recria a aplicação). Depois do bloco, suba de novo sem a variável.
+- Bloco 9: deixe `docker compose logs -f app` aberto num segundo terminal e
+  respeite os tempos (CT-T03 em menos de 30 s depois do CT-T02; CT-T04 e
+  CT-T05 depois de pelo menos 30 s). Se reiniciar a aplicação no meio, o
+  disjuntor volta FECHADO e a contagem recomeça.
 
 ---
 
-## 1. Subir o sistema
+## 2. Onde cada bloco mexe no código
 
-```bash
-cd ~/arq_proj_2026          # a pasta onde está o docker-compose.yml
-docker compose down -v      # zera os bancos (a tabela item mudou na Aula 12)
-docker compose up --build -d
-docker compose ps
-```
-
-**Esperado:** três containers. `trokr-db` e `trokr-mongo` como `healthy`,
-`trokr-app` como `running`/`Up`.
-
-```bash
-docker compose logs -f app       # Ctrl+C para sair
-```
-
-**Esperado:** a linha `Started TrokrApplication in X seconds`.
-
-| Se aparecer | O que é | O que fazer |
-|---|---|---|
-| `permission denied ... docker.sock` | usuário sem permissão no Docker | `sudo` na frente dos comandos |
-| `unknown command "compose"` | Docker antigo | usar `docker-compose` (com hífen) |
-| `port is already allocated` | porta 5432, 27017 ou 8090 em uso | `docker ps` e parar o container antigo |
-| `APPLICATION FAILED TO START` no log | erro na subida | copiar as últimas 40 linhas do log |
-| app reiniciando em loop | banco antigo com a tabela velha | `docker compose down -v` e subir de novo |
-
-```bash
-api $B/actuator/health
-```
-
-**Esperado:** `{"status":"UP"}` e `→ HTTP 200`.
+| Bloco | Casos | O que está sendo testado | Onde está |
+|---|---|---|---|
+| 0 | CT-00 | Swagger e contrato OpenAPI | `config/OpenApiConfig`, `@Tag`/`@Operation` nos controllers |
+| 1 | U01–U08 | ProblemDetail, VALIDACAO, REQUISICAO_INVALIDA | `exception/GlobalExceptionHandler`, `dto/UsuarioRequestDTO` |
+| 2 | I01–I12 | Factory + Builder, herança SINGLE_TABLE | `factory/*`, `model/Item*`, `service/ItemService` |
+| 3 | P01–P07 | Máquina da raiz, `@Version` crescendo | `model/state/proposta/*`, `model/Proposta` (campo `versao`) |
+| 4 | C01–C08 | Máquina da contraproposta, aceite em duas etapas, justificativa | `model/state/contraproposta/*`, `Proposta.aceitar` / `aceitarContraproposta` / `cancelar` |
+| 5 | F01–F06 | Facade + Observer + Strategy + Adapter | `service/PropostaService.finalizarNegociacao`, `listener/*`, `strategy/*`, `adapter/mongo/*` |
+| 6 | A01–A04 | Avaliação (Domain Model rico) | `model/Avaliacao.avaliar` |
+| 7 | K00–K02 | Corridas: `@Version` e UPDATE atômico | `Proposta.versao`, `UsuarioRepository.adicionarCreditos` |
+| 8 | E01–E03 | Erros do protocolo em ProblemDetail | `GlobalExceptionHandler.handleExceptionInternal` |
+| 9 | T01–T05 | Hexagonal + Decorator: retry e disjuntor | `notificacao/*`, `controller/DemoNotificacaoController` |
+| 10 | checklist | Swagger, ADRs, README | controllers, `docs/adr/`, `README.md` |
 
 ---
 
-## 2. Swagger (Aula 14)
+## 3. Registro de falhas (Apêndice C)
 
-Abra no navegador: **http://localhost:8090/swagger-ui.html**
+O roteiro pede que se leve esta tabela para a arguição ("explicar um bug
+encontrado e corrigido conta a favor"). Estas falhas foram encontradas
+comparando o projeto com o roteiro, caso a caso, e corrigidas antes de rodar.
+Acrescente aqui o que aparecer quando você executar.
 
-**Conferir:**
-- título **Trokr API 1.0.0**, com a descrição sobre a RFC 9457;
-- grupos em ordem alfabética: Avaliações, Demonstração, Histórico, Itens,
-  Logs, Propostas, Usuários. O **Hello não aparece** (`@Hidden`);
-- abrir `PATCH /propostas/{id}/finalizar`: a lista de respostas mostra
-  **200, 404 e 409**, e o 409 com `application/problem+json` e o esquema
-  `ProblemDetail`;
-- abrir `POST /itens`: o exemplo do corpo já vem preenchido (`@Schema`).
-
-```bash
-api $B/v3/api-docs | head -c 300
-```
-
-**Esperado:** começa com `{"openapi":"3.1.0","info":{"title":"Trokr API"...`.
-
----
-
-## 3. Cenário de teste
-
-```bash
-chmod +x preparar-cenario.sh corrida.sh
-./preparar-cenario.sh
-```
-
-**Esperado** (os números mudam):
-
-```
-==> 1. Criando usuários A, B e C...
-    Usuário A: id=1 | Usuário B: id=2 | Usuário C: id=3
-==> 2. Criando itens com categorias diferentes...
-    Item A (PRODUTO - 10 créditos): id=1
-    Item B (SERVICO - 15 créditos): id=2
-    Item C (EXPERIENCIA - 20 créditos): id=3
-==> 3. Montando Negociação 1 ...
-    Negociação 1 pronta em NEGOCIADO: Raiz=1 (Usuário A), Contraproposta=2 (Usuário B)
-==> 4. Montando Negociação 2 ...
-    Negociação 2 pronta em NEGOCIADO: Raiz=3 (Usuário C), Contraproposta=4 (Usuário A)
-...
-CENÁRIO PRONTO PARA A DEMONSTRAÇÃO DE CONCORRÊNCIA
-```
-
-Guarde os ids:
-
-```bash
-ID_A=1; ID_B=2; RAIZ_1=1; RAIZ_2=3      # troque pelos seus
-```
-
-Se der `Erro: POST /usuarios respondeu 000`: a aplicação ainda não subiu.
-Espere o `Started TrokrApplication`.
+| Caso | O que acontecia | Causa e correção | Corrigido? |
+|---|---|---|---|
+| CT-U01 a U03 | 400: `cidade é obrigatório` | A cidade era obrigatória no DTO e no banco. Virou opcional (`UsuarioRequestDTO`, `Usuario.cidade`). | ☑ |
+| CT-U07, I07, E03 | 400 sem `codigo` (formato padrão do Spring) | Os erros do próprio Spring não passavam pelo nosso formato. `handleExceptionInternal` agora dá `REQUISICAO_INVALIDA`, title e detail em português. | ☑ |
+| CT-E01, E02 | 404/405 sem `codigo` | Mesmo ponto: `ROTA_NAO_ENCONTRADA` e `METODO_NAO_SUPORTADO`. | ☑ |
+| CT-P02 | 400: `titulo é obrigatório` | A proposta exigia título e descrição. Viraram opcionais; o título vem do item. | ☑ |
+| CT-P02 | sem `raiz` e `versao` na resposta | `PropostaResponseDTO` ganhou `raiz`, `versao` e `propostaAnteriorId`. | ☑ |
+| CT-P03 | 409 com código `PROPOSTA_SEM_NEGOCIACAO` | Finalizar conferia a contraproposta antes do estado. Agora confere o estado da raiz primeiro: 409 `PROPOSTA_TRANSICAO_INVALIDA` citando o estado. | ☑ |
+| CT-P05, C05, C07 | 404 nas rotas `enviar-homologacao`, `recusar-homologacao`, `enviar`, `aceitar-contraproposta` | As ações eram PATCH com outros nomes (`/submeter`). Viraram POST com os nomes do roteiro. | ☑ |
+| CT-C01 | código `CONTRAPROPOSTA_PARA_SI_MESMO` | Renomeado para `CONTRAPROPOSTA_NA_PROPRIA_PROPOSTA`. | ☑ |
+| CT-C04 | 422 `ACAO_EXCLUSIVA_DA_RAIZ` | Ação da máquina errada é ação fora de hora: agora 409 `PROPOSTA_TRANSICAO_INVALIDA`. | ☑ |
+| CT-C06 | cancelar não tinha corpo nem justificativa | `POST /cancelar {justificativa}`; contraproposta sem justificativa → 422 `JUSTIFICATIVA_OBRIGATORIA`. | ☑ |
+| CT-C07 | aceitar levava raiz e contraproposta juntas para Negociado | Aceite em duas etapas: `/aceitar` (contra) e `/aceitar-contraproposta` (raiz). | ☑ |
+| CT-F01 | status `FINALIZADO` | Renomeado para `FINALIZADA`. | ☑ |
+| CT-F02 | a vencedora ia para `FINALIZADO_CONTRA` | A vencedora agora fica em `NEGOCIADO_CONTRA`; só as concorrentes são canceladas. | ☑ |
+| CT-F05 | log com tipo `TROCA_CONCLUIDA` | Tipo trocado para `INFO_GERAL`. | ☑ |
+| CT-A01 | 400: `usuarioId é obrigatório` | `usuarioId` virou opcional na avaliação. | ☑ |
+| CT-A02 | 409 `AVALIACAO_JA_PREENCHIDA` | Agora 422 `AVALIACAO_JA_REALIZADA`; a mensagem mostrava a nota nova em vez da registrada (corrigido). | ☑ |
+| CT-T01, T05 | 204 sem corpo | O interruptor responde 200 com o estado (`{"servicoNotificacao": "FORA_DO_AR"}`). | ☑ |
+| CT-K00 | `corrida.sh` com `BASE` incluindo `/propostas` | Trocado pelo script do professor; `cenario-final.sh` incluído. | ☑ |
+|  |  |  | ☐ |
+|  |  |  | ☐ |
 
 ---
 
-## 4. Concorrência (Aula 10)
-
-### 4.1 Religar a aplicação com o atraso de 2 s
-
-```bash
-TROKR_ATRASO_MS=2000 docker compose up -d
-docker compose logs -f app      # esperar o Started, Ctrl+C
-./preparar-cenario.sh           # cenário novo (o app reiniciou, mas os bancos ficaram)
-ID_A=...; RAIZ_1=...; RAIZ_2=...   # atualize com os ids novos
-```
-
-### 4.2 Corrida 1 — a mesma proposta finalizada duas vezes ao mesmo tempo
-
-```bash
-./corrida.sh $RAIZ_1
-```
-
-**Esperado** (a ordem das linhas pode trocar):
-
-```
-req 1 (proposta 1): 200
-req 2 (proposta 1): 409
-```
-
-Conferir que a troca **só aconteceu uma vez**:
-
-```bash
-api $B/usuarios/$ID_A                         # saldoCreditos = 10 (e não 20)
-api "$B/avaliacoes?propostaId=$RAIZ_1"        # 2 avaliações PENDENTE (e não 4)
-api "$B/logs?tipo=FINALIZACAO_RECUSADA"       # normalmente 1 aviso: a requisição que perdeu (AFTER_ROLLBACK)
-```
-
-| Se aparecer | Significa |
-|---|---|
-| `200` e `200` | o atraso não está ligado: refazer o 4.1 |
-| `200` e `500` | o 409 não foi tratado (ver `GlobalExceptionHandler`) |
-| saldo 20 | a troca rodou duas vezes |
-| `FINALIZACAO_RECUSADA` vazio | não é falha: depende da ordem em que os listeners rodaram na requisição que perdeu. O que prova a correção é o saldo 10 e as 2 avaliações |
-
-**Por quê:** as duas requisições leem a proposta na versão N. A primeira
-grava e passa para N+1. A segunda tenta gravar com N, e o `@Version` recusa:
-`OptimisticLockingFailureException` → **409
-`PROPOSTA_ALTERADA_CONCORRENTEMENTE`**.
-
-### 4.3 Corrida 2 — duas trocas diferentes do mesmo usuário ao mesmo tempo
-
-```bash
-./preparar-cenario.sh           # cenário novo: a corrida 1 já finalizou a Raiz 1
-ID_A=...; RAIZ_1=...; RAIZ_2=...   # os ids novos
-./corrida.sh $RAIZ_1 $RAIZ_2
-api $B/usuarios/$ID_A
-```
-
-**Esperado:** `200` e `200`, e `"saldoCreditos":20` (10 + 10).
-
-Se o saldo vier **10**, houve *lost update*: uma soma apagou a outra.
-O UPDATE atômico (`saldo = saldo + :valor`) existe para isso não acontecer.
-
-### 4.4 Desligar o atraso
-
-```bash
-docker compose up -d            # sem a variável: atraso volta a 0
-```
-
----
-
-## 5. Tratamento de exceções (Aula 11)
-
-Todo erro volta como **ProblemDetail** (`Content-Type: application/problem+json`):
-
-```json
-{
-  "type": "https://trokr.local/erros/usuario-nao-encontrado",
-  "title": "Recurso não encontrado",
-  "status": 404,
-  "detail": "Usuário não encontrado com id 999",
-  "instance": "/usuarios/999",
-  "codigo": "USUARIO_NAO_ENCONTRADO",
-  "timestamp": "2026-11-23T17:00:00Z"
-}
-```
-
-`title` é fixo por tipo de erro, `detail` explica esta ocorrência, `codigo`
-é estável para o programa cliente decidir o que fazer.
-
-### 5.1 404 — RecursoNaoEncontradoException
-
-```bash
-api $B/usuarios/999
-api $B/propostas/999
-```
-
-**Esperado:** `HTTP 404`, `codigo` `USUARIO_NAO_ENCONTRADO` e
-`PROPOSTA_NAO_ENCONTRADA`.
-
-### 5.2 409 — TransicaoInvalidaException (o State recusou)
-
-```bash
-./preparar-cenario.sh                                  # pegar uma RAIZ_1 nova
-RAIZ_1=...                                             # o id novo
-api -X PATCH $B/propostas/$RAIZ_1/finalizar            # 1ª vez
-api -X PATCH $B/propostas/$RAIZ_1/finalizar            # 2ª vez
-api -X PATCH $B/propostas/$RAIZ_1/aprovar              # aprovar algo Finalizado
-```
-
-**Esperado:**
-1. `HTTP 200`, `"status":"FINALIZADO"`;
-2. `HTTP 409`, `PROPOSTA_SEM_NEGOCIACAO`: "Nenhuma contraproposta em negociação para finalizar";
-3. `HTTP 409`, `PROPOSTA_TRANSICAO_INVALIDA`: "Transição inválida: Finalizado → Ativa".
-
-### 5.3 422 — RegraNegocioException (regra de negócio)
-
-```bash
-api -X POST $B/usuarios -d '{"nome":"Rafael","email":"rafa@trokr.dev","cidade":"Formosa"}'
-api -X POST $B/usuarios -d '{"nome":"Outro","email":"rafa@trokr.dev","cidade":"Formosa"}'
-```
-
-**Esperado:** o 1º `HTTP 201`; o 2º `HTTP 422`, `EMAIL_JA_CADASTRADO`:
-"Já existe um usuário com o e-mail rafa@trokr.dev".
-
-### 5.4 400 — validação (`@Valid`) com a lista de campos
-
-```bash
-api -X POST $B/usuarios -d '{"nome":"","email":"isso-nao-e-email"}'
-```
-
-**Esperado:** `HTTP 400`, `codigo` `VALIDACAO` e:
-
-```json
-"campos": [
-  {"campo": "nome",   "mensagem": "nome é obrigatório"},
-  {"campo": "email",  "mensagem": "email deve ter um formato válido"},
-  {"campo": "cidade", "mensagem": "cidade é obrigatório"}
-]
-```
-
-(a ordem dos campos pode variar)
-
-```bash
-api $B/usuarios/abc
-```
-
-**Esperado:** `HTTP 400` em ProblemDetail, gerado pelo próprio Spring
-(é isso que o `ResponseEntityExceptionHandler` nos dá de graça).
-
-### 5.5 403, 400 e 409 na mesma avaliação
-
-```bash
-api "$B/avaliacoes?propostaId=$RAIZ_1"
-```
-
-Pegue o `id` de uma avaliação e o `usuarioAutorId` dela:
-
-```bash
-AV=1; AUTOR=1; OUTRO=3                         # troque pelos seus
-api -X PATCH $B/avaliacoes/$AV -d "{\"usuarioId\":$OUTRO,\"nota\":5}"
-api -X PATCH $B/avaliacoes/$AV -d "{\"usuarioId\":$AUTOR,\"nota\":9}"
-api -X PATCH $B/avaliacoes/$AV -d "{\"usuarioId\":$AUTOR,\"nota\":5,\"descricao\":\"Troca ótima\"}"
-api -X PATCH $B/avaliacoes/$AV -d "{\"usuarioId\":$AUTOR,\"nota\":4}"
-```
-
-**Esperado:**
-1. `HTTP 403`, `AVALIACAO_AUTOR_INVALIDO` (não é o autor);
-2. `HTTP 400`, `VALIDACAO`, campo `nota`: "nota máxima é 5";
-3. `HTTP 200`, `"status":"AVALIADA"`;
-4. `HTTP 409`, `AVALIACAO_JA_PREENCHIDA`.
-
-### 5.6 500 — o catch-all
-
-```bash
-api $B/demo/erro-inesperado
-```
-
-**Esperado:** `HTTP 500`, `ERRO_INTERNO`, mensagem genérica e um campo
-`ocorrencia` (um UUID). **Nunca** aparece o NullPointerException para o cliente.
-
-```bash
-docker compose logs app | grep ocorrencia      # o stack trace, com o MESMO UUID
-api "$B/logs?tipo=ERRO_SISTEMA"                # o LogEvento no Mongo, com o MESMO UUID
-```
-
----
-
-## 6. Factory + Builder (Aula 12)
-
-```bash
-api -X POST $B/itens -d "{\"titulo\":\"Violão\",\"descricao\":\"Cordas novas\",\"categoria\":\"PRODUTO\",\"pesoGramas\":2500,\"usuarioId\":$ID_A}"
-```
-
-**Esperado:** `HTTP 201`, com `"categoria":"PRODUTO"` e `"pesoGramas":2500`,
-**sem** `duracaoMinutos` nem `nivel` na resposta. Guarde o id: `ITEM=...`.
-
-| Teste | Corpo (resumido) | Esperado |
-|---|---|---|
-| produto sem peso | `"categoria":"PRODUTO"` sem `pesoGramas` | `422 ITEM_DADOS_INCOMPLETOS` — "Um item da categoria PRODUTO precisa informar pesoGramas" |
-| serviço com peso | `"categoria":"SERVICO","duracaoMinutos":30,"pesoGramas":200` | `422 ITEM_CAMPO_INCOMPATIVEL` — "Um item da categoria SERVICO não tem o campo pesoGramas" |
-| experiência sem nível | `"categoria":"EXPERIENCIA"` | `422 ITEM_DADOS_INCOMPLETOS` |
-| peso negativo | `"pesoGramas":-5` | `400 VALIDACAO` — "pesoGramas deve ser maior que zero" |
-| produto virar serviço | `PUT /itens/$ITEM` com `"categoria":"SERVICO","duracaoMinutos":60` | `422 ITEM_CATEGORIA_IMUTAVEL` |
-
-Comandos prontos:
-
-```bash
-api -X POST $B/itens -d "{\"titulo\":\"Livro\",\"descricao\":\"x\",\"categoria\":\"PRODUTO\",\"usuarioId\":$ID_A}"
-api -X POST $B/itens -d "{\"titulo\":\"Conserto\",\"descricao\":\"x\",\"categoria\":\"SERVICO\",\"duracaoMinutos\":30,\"pesoGramas\":200,\"usuarioId\":$ID_A}"
-api -X POST $B/itens -d "{\"titulo\":\"Trilha\",\"descricao\":\"x\",\"categoria\":\"EXPERIENCIA\",\"usuarioId\":$ID_A}"
-api -X POST $B/itens -d "{\"titulo\":\"Caixa\",\"descricao\":\"x\",\"categoria\":\"PRODUTO\",\"pesoGramas\":-5,\"usuarioId\":$ID_A}"
-api -X PUT  $B/itens/$ITEM -d "{\"titulo\":\"Violão\",\"descricao\":\"x\",\"categoria\":\"SERVICO\",\"duracaoMinutos\":60,\"usuarioId\":$ID_A}"
-```
-
-Ver a herança SINGLE_TABLE no banco:
-
-```bash
-docker exec -it trokr-db psql -U trokr_user -d trokr_db \
-  -c "select id, categoria, titulo, peso_gramas, duracao_minutos, nivel from item;"
-```
-
-**Esperado:** uma tabela só; a coluna `categoria` é o discriminador; cada
-linha só tem preenchida a coluna do seu tipo (as outras ficam vazias).
-
----
-
-## 7. Tolerância a falhas: retry + disjuntor (Aula 13)
-
-```bash
-./preparar-cenario.sh                                   # duas negociações novas
-RAIZ_1=...; RAIZ_2=...                                  # os ids impressos
-api -X PATCH $B/demo/notificacao/fora-do-ar             # → HTTP 204
-api -X PATCH $B/propostas/$RAIZ_1/finalizar             # → HTTP 200 (demora ~1 s)
-api -X PATCH $B/propostas/$RAIZ_2/finalizar             # → HTTP 200 (rápido)
-api "$B/logs?tipo=NOTIFICACAO_PENDENTE"                 # → 3 eventos
-```
-
-**O ponto principal:** com o serviço de notificação **morto**, as duas
-finalizações respondem **200** e as trocas são concluídas.
-
-No log da aplicação:
-
-```bash
-docker compose logs app | grep -E "Tentativa|Disjuntor|pendente|falhou"
-```
-
-**Esperado, nesta ordem** (no log aparecem os ids; aqui A, B e C são os usuários do cenário):
-
-```
-Tentativa 1 de 3 para o usuário A falhou; nova tentativa em 200 ms
-Tentativa 2 de 3 para o usuário A falhou; nova tentativa em 400 ms
-Notificação para o usuário A falhou                         ← 3 falhas: desistiu de A
-Tentativa 1 de 3 para o usuário B falhou; nova tentativa em 200 ms
-Disjuntor ABERTO até 2026-...                               ← 5ª falha seguida
-Tentativa 2 de 3 para o usuário B falhou; nova tentativa em 400 ms
-Disjuntor aberto: notificação para o usuário B ficou pendente
-Disjuntor aberto: notificação para o usuário C ficou pendente   ← 2ª troca: nem tenta
-Disjuntor aberto: notificação para o usuário A ficou pendente
-```
-
-Contagem: 5 chamadas ao serviço, **3 pendências** (B da 1ª troca, as duas da
-2ª), **1 falha definitiva** (A da 1ª troca, em `GET /logs?tipo=ERRO_SISTEMA`).
-
-Religar:
-
-```bash
-api -X PATCH $B/demo/notificacao/no-ar                  # → HTTP 204
-sleep 30
-./preparar-cenario.sh                                   # uma troca nova
-api -X PATCH $B/propostas/RAIZ_NOVA/finalizar
-docker compose logs app | grep -E "FECHADO|NOTIFICACAO ENVIADA" | tail -3
-```
-
-**Esperado:** `Disjuntor FECHADO: o serviço voltou` e
-`[NOTIFICACAO ENVIADA] usuario=...`.
-
-> O estado do disjuntor fica na memória: se reiniciar a aplicação, ele volta
-> FECHADO. Se o teste não bater, rode `docker compose restart app` e repita
-> a partir do `fora-do-ar`.
-
-Retry sozinho, sem disjuntor (opcional):
-
-```bash
-TROKR_TAXA_FALHA=0.5 docker compose up -d     # metade das chamadas falha
-```
-
-Finalize uma troca e procure `Tentativa 1 de 3` no log. Volte com
-`docker compose up -d`.
-
----
-
-## 8. Conferir os dados nos bancos (se pedirem)
-
-```bash
-# MongoDB: o log de eventos
-docker exec -it trokr-mongo mongosh -u trokr -p trokr123 --authenticationDatabase admin \
-  --eval 'db.getSiblingDB("trokr").log_evento.aggregate([{$group:{_id:"$tipo",total:{$sum:1}}}])'
-
-# Postgres: as tabelas do negócio
-docker exec -it trokr-db psql -U trokr_user -d trokr_db -c "\dt"
-docker exec -it trokr-db psql -U trokr_user -d trokr_db -c "select id, titulo, status, versao from proposta;"
-```
-
-A coluna `versao` é o `@Version`: cada gravação da proposta soma 1.
-
----
-
-## 9. Desligar
-
-```bash
-docker compose down -v
-```
-
----
-
-## 10. Perguntas prováveis e respostas curtas
+## 4. Perguntas prováveis na arguição
 
 ### Concorrência (Aula 10)
 
@@ -463,7 +119,20 @@ status a ela, o código não compila.
 
 **Por que a 4ª subclasse, AcessoNegado (403)?**
 Aceitar a contraproposta de outra pessoa não é regra violada (422) nem
-estado errado (409): é falta de permissão.
+estado errado (409): é falta de permissão. No roteiro do professor não há
+login, então `?usuarioId=` é opcional: só quando ele é informado a autoria é
+conferida.
+
+**Por que aprovar uma contraproposta dá 409 e não 422 (CT-C04)?**
+É uma ação fora de hora: a máquina daquela proposta não tem essa transição.
+Regra violada (422) é outra coisa, como ofertar item de outra pessoa.
+
+**Por que o JSON malformado dá 400 REQUISICAO_INVALIDA e não VALIDACAO?**
+VALIDACAO é o Bean Validation recusando um JSON que foi lido (nome vazio,
+nota 7). REQUISICAO_INVALIDA é antes disso: o JSON nem pôde ser lido, ou um
+valor não pertence ao enum. Os dois saem do `GlobalExceptionHandler`, o
+segundo pelo `handleExceptionInternal`, que dá o mesmo formato aos erros do
+próprio Spring (rota inexistente, método errado, "abc" no lugar do id).
 
 **Por que o 500 não mostra a mensagem da exceção?**
 Ela pode ter SQL, nome de tabela, caminho de arquivo. O cliente recebe um

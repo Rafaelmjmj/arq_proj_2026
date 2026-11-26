@@ -2,10 +2,13 @@
 # Preparação do cenário didático da Aula 10 — Concorrência no Trokr.
 #
 # Adaptado do script da aula para as rotas deste projeto:
-#   - usuário exige "cidade"; proposta raiz exige "titulo" e "descricao";
-#   - transições são PATCH: /submeter (raiz → Homologação, contra → Em Análise),
-#     /aprovar, /aceitar?usuarioId=<dono da raiz>;
-#   - a contraproposta é criada em POST /propostas/{id}/contrapropostas.
+#   - as rotas seguem o roteiro de testes do professor: ações por POST
+#     (/enviar-homologacao, /aprovar, /enviar, /aceitar, /aceitar-contraproposta)
+#     e finalização por PATCH;
+#   - a contraproposta é criada em POST /propostas/{id}/contrapropostas;
+#   - o aceite tem duas etapas: a contraproposta (/aceitar) e a raiz
+#     (/aceitar-contraproposta).
+# Para o roteiro oficial do professor, use o cenario-final.sh.
 #
 # Monta duas negociações em NEGOCIADO com o usuário A em comum:
 #   Troca 1: raiz de A (PRODUTO, 10 créditos) x contraproposta de B (SERVICO, 15)
@@ -67,11 +70,12 @@ negociar() {
     local dono=$1 item_dono=$2 autor=$3 item_autor=$4
     local raiz contra
     raiz=$(chamar POST /propostas "{\"titulo\": \"Troca de teste\", \"descricao\": \"Cenário da Aula 10\", \"usuarioId\": $dono, \"itemId\": $item_dono}" | extrair_id)
-    chamar PATCH "/propostas/$raiz/submeter" >/dev/null
-    chamar PATCH "/propostas/$raiz/aprovar" >/dev/null
+    chamar POST "/propostas/$raiz/enviar-homologacao" >/dev/null
+    chamar POST "/propostas/$raiz/aprovar" >/dev/null
     contra=$(chamar POST "/propostas/$raiz/contrapropostas" "{\"descricao\": \"Contraproposta de teste\", \"usuarioId\": $autor, \"itemId\": $item_autor}" | extrair_id)
-    chamar PATCH "/propostas/$contra/submeter" >/dev/null
-    chamar PATCH "/propostas/$contra/aceitar?usuarioId=$dono" >/dev/null
+    chamar POST "/propostas/$contra/enviar" >/dev/null
+    chamar POST "/propostas/$contra/aceitar?usuarioId=$dono" >/dev/null
+    chamar POST "/propostas/$raiz/aceitar-contraproposta?usuarioId=$dono" >/dev/null
     echo "$raiz $contra"
 }
 

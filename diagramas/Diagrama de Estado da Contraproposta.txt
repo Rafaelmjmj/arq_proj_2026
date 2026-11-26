@@ -1,21 +1,27 @@
 @startuml
 ' Máquina da CONTRAPROPOSTA (propostaPai != null) — interface EstadoContraproposta
+' Nomes e rotas alinhados ao Roteiro de Testes da Entrega Final.
 
 [*] --> Rascunho
 
-Rascunho --> Em_Analise : submeter
-Rascunho --> Cancelado_Contra : cancelar\n/ raiz encerrada (cascata)
+Rascunho --> Em_Analise : enviar
+Rascunho --> Cancelado_Contra : cancelar (com justificativa)\n/ raiz encerrada (cascata)
 
-Em_Analise --> Negociado_Contra : dono da raiz aceita
+Em_Analise --> Negociado_Contra : aceitar\n(1ª etapa do aceite)
 Em_Analise --> Recusado : dono da raiz recusa
 Em_Analise --> Rascunho : editar
-Em_Analise --> Cancelado_Contra : cancelar\n/ outra contraproposta fechou a troca (cascata)
+Em_Analise --> Cancelado_Contra : cancelar (com justificativa)\n/ raiz finalizada com outra (cascata)
 
-Negociado_Contra --> Finalizado_Contra : finalizar (troca concluída)
 Negociado_Contra --> Recusado : uma parte desiste\n/ raiz cancelada (cascata)
+Negociado_Contra --> [*] : raiz FINALIZADA\n(a vencedora permanece Negociado_Contra)
 
-Finalizado_Contra --> [*]
 Recusado --> [*]
 Cancelado_Contra --> [*]
+
+note right of Negociado_Contra
+  2ª etapa: a raiz confirma com
+  aceitar-contraproposta.
+  Só uma contraproposta aceita por vez.
+end note
 
 @enduml

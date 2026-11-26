@@ -20,8 +20,7 @@ public record UsuarioRequestDTO(
         @Email(message = "email deve ter um formato válido")
         String email,
 
-        @Schema(description = "Cidade, para trocas presenciais", example = "Formosa")
-        @NotBlank(message = "cidade é obrigatório")
+        @Schema(description = "Opcional: cidade, para trocas presenciais", example = "Formosa")
         String cidade
 ) {
 }

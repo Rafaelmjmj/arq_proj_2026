@@ -81,13 +81,16 @@ package "Domínio (Postgres / JPA)" {
     + {static} criarContraProposta(descricao, autor, item, pai): Proposta
     + mudarEstadoPara(novo: EstadoProposta): void
     + mudarEstadoPara(novo: EstadoContraproposta): void
-    + submeter(): void
+    + enviarParaHomologacao(): void
+    + enviarParaAnalise(): void
     + aprovar(): void
+    + recusarHomologacao(): void
     + voltarParaRascunho(): void
     + aceitar(quem: Usuario): void
+    + aceitarContraproposta(quem: Usuario): void
     + recusar(quem: Usuario): void
     + desistirDaNegociacao(quem: Usuario): void
-    + cancelar(): void
+    + cancelar(justificativa: String): void
     + finalizar(): void
     + isContraProposta(): boolean
     + getRaiz(): Proposta
@@ -100,11 +103,11 @@ package "Domínio (Postgres / JPA)" {
     HOMOLOGACAO
     ATIVA
     NEGOCIADO_RAIZ
-    FINALIZADO
+    FINALIZADA
     CANCELADO_RAIZ
     EM_ANALISE
     NEGOCIADO_CONTRA
-    FINALIZADO_CONTRA
+    FINALIZADO_CONTRA (não usado: a vencedora fica NEGOCIADO_CONTRA)
     RECUSADO
     CANCELADO_CONTRA
   }
@@ -193,12 +196,15 @@ package "Facade + Observer" {
     --
     + criarProposta(...): Proposta
     + criarContraproposta(...): Proposta
-    + submeter(id): Proposta
+    + enviarParaHomologacao(id): Proposta
+    + enviarParaAnalise(id): Proposta
     + aprovar(id): Proposta
+    + recusarHomologacao(id): Proposta
     + aceitar(id, usuarioId): Proposta
+    + aceitarContraproposta(id, usuarioId): Proposta
     + recusar(id, usuarioId): Proposta
     + desistirDaNegociacao(id, usuarioId): Proposta
-    + cancelar(id): Proposta
+    + cancelar(id, justificativa): Proposta
     + finalizarNegociacao(id): Proposta
     - construirEventoDeTrocaConcluida(p): TrocaConcluidaEvent
   }

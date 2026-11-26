@@ -41,7 +41,7 @@
       ],
       "body": {
         "mimeType": "application/json",
-        "text": "{\n  \"nome\": \"Ana\",\n  \"email\": \"ana@trokr.dev\",\n  \"cidade\": \"Formosa\"\n}"
+        "text": "{\n  \"nome\": \"Ana\",\n  \"email\": \"ana@trokr.dev\"\n}"
       }
     },
     {
@@ -59,7 +59,7 @@
       ],
       "body": {
         "mimeType": "application/json",
-        "text": "{\n  \"nome\": \"Bruno\",\n  \"email\": \"bruno@trokr.dev\",\n  \"cidade\": \"Formosa\"\n}"
+        "text": "{\n  \"nome\": \"Bruno\",\n  \"email\": \"bruno@trokr.dev\"\n}"
       }
     },
     {
@@ -77,7 +77,7 @@
       ],
       "body": {
         "mimeType": "application/json",
-        "text": "{\n  \"nome\": \"Carla\",\n  \"email\": \"carla@trokr.dev\",\n  \"cidade\": \"Formosa\"\n}"
+        "text": "{\n  \"nome\": \"Carla\",\n  \"email\": \"carla@trokr.dev\"\n}"
       }
     },
     {
@@ -157,7 +157,7 @@
       "_type": "request",
       "parentId": "fld_roteiro",
       "name": "08 ERRO esperado: aprovar em Rascunho (409)",
-      "method": "PATCH",
+      "method": "POST",
       "url": "{{ _.base_url }}/propostas/1/aprovar",
       "headers": []
     },
@@ -165,9 +165,9 @@
       "_id": "req_009",
       "_type": "request",
       "parentId": "fld_roteiro",
-      "name": "09 Submeter raiz (→ HOMOLOGACAO)",
-      "method": "PATCH",
-      "url": "{{ _.base_url }}/propostas/1/submeter",
+      "name": "09 Enviar raiz para homologação (→ HOMOLOGACAO)",
+      "method": "POST",
+      "url": "{{ _.base_url }}/propostas/1/enviar-homologacao",
       "headers": []
     },
     {
@@ -175,7 +175,7 @@
       "_type": "request",
       "parentId": "fld_roteiro",
       "name": "10 Aprovar raiz (→ ATIVA)",
-      "method": "PATCH",
+      "method": "POST",
       "url": "{{ _.base_url }}/propostas/1/aprovar",
       "headers": []
     },
@@ -219,18 +219,18 @@
       "_id": "req_013",
       "_type": "request",
       "parentId": "fld_roteiro",
-      "name": "13 Submeter contraproposta de B (→ EM_ANALISE)",
-      "method": "PATCH",
-      "url": "{{ _.base_url }}/propostas/2/submeter",
+      "name": "13 Enviar contraproposta de B (→ EM_ANALISE)",
+      "method": "POST",
+      "url": "{{ _.base_url }}/propostas/2/enviar",
       "headers": []
     },
     {
       "_id": "req_014",
       "_type": "request",
       "parentId": "fld_roteiro",
-      "name": "14 Submeter contraproposta de C (→ EM_ANALISE)",
-      "method": "PATCH",
-      "url": "{{ _.base_url }}/propostas/3/submeter",
+      "name": "14 Enviar contraproposta de C (→ EM_ANALISE)",
+      "method": "POST",
+      "url": "{{ _.base_url }}/propostas/3/enviar",
       "headers": []
     },
     {
@@ -247,7 +247,7 @@
       "_type": "request",
       "parentId": "fld_roteiro",
       "name": "16 ERRO esperado: B aceitar a própria (403)",
-      "method": "PATCH",
+      "method": "POST",
       "url": "{{ _.base_url }}/propostas/2/aceitar?usuarioId=2",
       "headers": []
     },
@@ -255,9 +255,18 @@
       "_id": "req_017",
       "_type": "request",
       "parentId": "fld_roteiro",
-      "name": "17 A aceita a de B (raiz e contra → NEGOCIADO)",
-      "method": "PATCH",
+      "name": "17 A aceita a de B (contra → NEGOCIADO_CONTRA)",
+      "method": "POST",
       "url": "{{ _.base_url }}/propostas/2/aceitar?usuarioId=1",
+      "headers": []
+    },
+    {
+      "_id": "req_017b",
+      "_type": "request",
+      "parentId": "fld_roteiro",
+      "name": "17b A confirma na raiz (raiz → NEGOCIADO_RAIZ)",
+      "method": "POST",
+      "url": "{{ _.base_url }}/propostas/1/aceitar-contraproposta?usuarioId=1",
       "headers": []
     },
     {
@@ -273,7 +282,7 @@
       "_id": "req_019",
       "_type": "request",
       "parentId": "fld_roteiro",
-      "name": "19 Conferir raiz FINALIZADO",
+      "name": "19 Conferir raiz FINALIZADA (e a de B continua NEGOCIADO_CONTRA)",
       "method": "GET",
       "url": "{{ _.base_url }}/propostas/1",
       "headers": []
@@ -345,7 +354,7 @@
       "_id": "req_026",
       "_type": "request",
       "parentId": "fld_roteiro",
-      "name": "26 ERRO esperado: avaliar de novo (409)",
+      "name": "26 ERRO esperado: avaliar de novo (422 AVALIACAO_JA_REALIZADA)",
       "method": "PATCH",
       "url": "{{ _.base_url }}/avaliacoes/1",
       "headers": [
@@ -552,9 +561,9 @@
       "_id": "req_044",
       "_type": "request",
       "parentId": "fld_propostas",
-      "name": "Submeter",
-      "method": "PATCH",
-      "url": "{{ _.base_url }}/propostas/1/submeter",
+      "name": "Enviar para homologação (raiz)",
+      "method": "POST",
+      "url": "{{ _.base_url }}/propostas/1/enviar-homologacao",
       "headers": []
     },
     {
@@ -562,7 +571,7 @@
       "_type": "request",
       "parentId": "fld_propostas",
       "name": "Aprovar",
-      "method": "PATCH",
+      "method": "POST",
       "url": "{{ _.base_url }}/propostas/1/aprovar",
       "headers": []
     },
@@ -571,7 +580,7 @@
       "_type": "request",
       "parentId": "fld_propostas",
       "name": "Editar (volta p/ Rascunho)",
-      "method": "PATCH",
+      "method": "POST",
       "url": "{{ _.base_url }}/propostas/1/editar",
       "headers": []
     },
@@ -579,10 +588,14 @@
       "_id": "req_047",
       "_type": "request",
       "parentId": "fld_propostas",
-      "name": "Cancelar",
-      "method": "PATCH",
+      "name": "Cancelar (contraproposta exige justificativa)",
+      "method": "POST",
       "url": "{{ _.base_url }}/propostas/1/cancelar",
-      "headers": []
+      "headers": [],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"justificativa\": \"Encontrei outra troca\"\n}"
+      }
     },
     {
       "_id": "req_048",
@@ -597,9 +610,18 @@
       "_id": "req_049",
       "_type": "request",
       "parentId": "fld_propostas",
-      "name": "Aceitar contraproposta",
-      "method": "PATCH",
+      "name": "Aceitar contraproposta (1ª etapa)",
+      "method": "POST",
       "url": "{{ _.base_url }}/propostas/2/aceitar?usuarioId=1",
+      "headers": []
+    },
+    {
+      "_id": "req_049b",
+      "_type": "request",
+      "parentId": "fld_propostas",
+      "name": "Confirmar contraproposta aceita na raiz (2ª etapa)",
+      "method": "POST",
+      "url": "{{ _.base_url }}/propostas/1/aceitar-contraproposta?usuarioId=1",
       "headers": []
     },
     {
@@ -607,7 +629,7 @@
       "_type": "request",
       "parentId": "fld_propostas",
       "name": "Recusar contraproposta em análise",
-      "method": "PATCH",
+      "method": "POST",
       "url": "{{ _.base_url }}/propostas/2/recusar?usuarioId=1",
       "headers": []
     },
@@ -616,7 +638,7 @@
       "_type": "request",
       "parentId": "fld_propostas",
       "name": "Desistir da negociação",
-      "method": "PATCH",
+      "method": "POST",
       "url": "{{ _.base_url }}/propostas/2/desistir?usuarioId=2",
       "headers": []
     },
@@ -673,7 +695,7 @@
       "_type": "request",
       "parentId": "fld_aula11",
       "name": "2 · 409 PROPOSTA_TRANSICAO_INVALIDA (aprovar fora da Homologação)",
-      "method": "PATCH",
+      "method": "POST",
       "url": "{{ _.base_url }}/propostas/1/aprovar",
       "headers": []
     },

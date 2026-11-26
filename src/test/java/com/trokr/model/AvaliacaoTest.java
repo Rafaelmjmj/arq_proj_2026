@@ -6,10 +6,10 @@ import static com.trokr.model.Fixtures.usuario;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.trokr.exception.AcessoNegadoException;
 import com.trokr.exception.RegraNegocioException;
-import com.trokr.exception.TransicaoInvalidaException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -44,7 +44,11 @@ class AvaliacaoTest {
     @Test
     void naoAvaliaDuasVezes() {
         anaAvaliaBruno.avaliar(ana, 5, "Ótimo");
-        assertThrows(TransicaoInvalidaException.class, () -> anaAvaliaBruno.avaliar(ana, 1, "Mudei de ideia"));
+        RegraNegocioException erro = assertThrows(RegraNegocioException.class,
+                () -> anaAvaliaBruno.avaliar(ana, 1, "Mudei de ideia")); // CT-A02: 422
+        assertEquals("AVALIACAO_JA_REALIZADA", erro.getCodigo());
+        assertEquals(5, anaAvaliaBruno.getNota()); // a nota continua 5
+        assertTrue(erro.getMessage().contains("nota 5"));
         assertEquals(5, anaAvaliaBruno.getNota());
     }
 
@@ -58,5 +62,11 @@ class AvaliacaoTest {
     void notaForaDaFaixa() {
         assertThrows(RegraNegocioException.class, () -> anaAvaliaBruno.avaliar(ana, 6, "?"));
         assertThrows(RegraNegocioException.class, () -> anaAvaliaBruno.avaliar(ana, 0, "?"));
+    }
+
+    @Test
+    void semInformarQuemAvaliaAChecagemDeAutoriaEhPulada() { // CT-A01 manda só nota e descrição
+        anaAvaliaBruno.avaliar(null, 5, "Livro em ótimo estado");
+        assertEquals(StatusAvaliacao.AVALIADA, anaAvaliaBruno.getStatus());
     }
 }

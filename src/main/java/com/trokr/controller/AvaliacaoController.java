@@ -65,13 +65,11 @@ public class AvaliacaoController {
             content = @Content(mediaType = "application/json", schema = @Schema(implementation = AvaliacaoResponseDTO.class)))
     @ApiResponse(responseCode = "400", description = "Corpo inválido: a lista 'campos' diz o que corrigir (VALIDACAO)",
             content = @Content(mediaType = "application/problem+json", schema = @Schema(implementation = ProblemDetail.class)))
-    @ApiResponse(responseCode = "403", description = "Quem preenche não é o autor (AVALIACAO_AUTOR_INVALIDO)",
+    @ApiResponse(responseCode = "403", description = "usuarioId informado não é o autor (AVALIACAO_AUTOR_INVALIDO)",
             content = @Content(mediaType = "application/problem+json", schema = @Schema(implementation = ProblemDetail.class)))
     @ApiResponse(responseCode = "404", description = "AVALIACAO_NAO_ENCONTRADA",
             content = @Content(mediaType = "application/problem+json", schema = @Schema(implementation = ProblemDetail.class)))
-    @ApiResponse(responseCode = "409", description = "A avaliação já foi preenchida (AVALIACAO_JA_PREENCHIDA)",
-            content = @Content(mediaType = "application/problem+json", schema = @Schema(implementation = ProblemDetail.class)))
-    @ApiResponse(responseCode = "422", description = "Nota fora de 1 a 5 (AVALIACAO_NOTA_INVALIDA)",
+    @ApiResponse(responseCode = "422", description = "A avaliação já foi realizada (AVALIACAO_JA_REALIZADA)",
             content = @Content(mediaType = "application/problem+json", schema = @Schema(implementation = ProblemDetail.class)))
     @PatchMapping("/{id}")
     public AvaliacaoResponseDTO avaliar(

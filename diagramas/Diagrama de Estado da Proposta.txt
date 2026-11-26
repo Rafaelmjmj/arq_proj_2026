@@ -1,24 +1,25 @@
 @startuml
 ' Máquina da Proposta RAIZ (propostaPai == null) — interface EstadoProposta
+' Nomes e rotas alinhados ao Roteiro de Testes da Entrega Final.
 
 [*] --> Rascunho
 
-Rascunho --> Homologacao : submeter
+Rascunho --> Homologacao : enviar-homologacao
 Rascunho --> Cancelado_Raiz : cancelar
 
 Homologacao --> Ativa : aprovar
-Homologacao --> Rascunho : editar
+Homologacao --> Rascunho : recusar-homologacao / editar
 Homologacao --> Cancelado_Raiz : cancelar
 
-Ativa --> Negociado_Raiz : dono aceita uma contraproposta
+Ativa --> Negociado_Raiz : aceitar-contraproposta\n(confirma a contraproposta aceita)
 Ativa --> Rascunho : editar
 Ativa --> Cancelado_Raiz : cancelar
 
-Negociado_Raiz --> Finalizado : finalizar (troca realizada)
+Negociado_Raiz --> Finalizada : finalizar (troca realizada)
 Negociado_Raiz --> Ativa : uma parte desiste da negociação
 Negociado_Raiz --> Cancelado_Raiz : cancelar
 
-Finalizado --> [*]
+Finalizada --> [*]
 Cancelado_Raiz --> [*]
 
 note right of Ativa
@@ -26,9 +27,11 @@ note right of Ativa
   contrapropostas.
 end note
 
-note right of Finalizado
+note right of Finalizada
   Publica TrocaConcluidaEvent
   (Observer, via PropostaService).
+  Concorrentes abertas → Cancelado_Contra;
+  a vencedora fica em Negociado_Contra.
 end note
 
 note bottom of Cancelado_Raiz

@@ -34,7 +34,7 @@ public final class FabricaDeEstados {
             Status.HOMOLOGACAO, EstadoHomologacao::new,
             Status.ATIVA, EstadoAtiva::new,
             Status.NEGOCIADO_RAIZ, EstadoNegociado::new,
-            Status.FINALIZADO, EstadoFinalizado::new,
+            Status.FINALIZADA, EstadoFinalizado::new,
             Status.CANCELADO_RAIZ, EstadoCancelado::new
     );
 

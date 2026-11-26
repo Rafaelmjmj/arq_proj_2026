@@ -1,7 +1,6 @@
 package com.trokr.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
 /**
@@ -10,12 +9,10 @@ import jakarta.validation.constraints.NotNull;
  */
 public record PropostaRequestDTO(
 
-        @Schema(description = "Título da proposta", example = "Troco bicicleta")
-        @NotBlank(message = "titulo é obrigatório")
+        @Schema(description = "Opcional: sem ele, vem do título do item", example = "Troco bicicleta")
         String titulo,
 
-        @Schema(description = "O que se procura em troca", example = "Aceito instrumento musical ou aulas")
-        @NotBlank(message = "descricao é obrigatória")
+        @Schema(description = "Opcional: o que se procura em troca", example = "Aceito instrumento musical ou aulas")
         String descricao,
 
         @Schema(description = "Autor da proposta", example = "1")

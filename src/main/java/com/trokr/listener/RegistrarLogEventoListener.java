@@ -10,7 +10,7 @@ import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
 /**
- * Listener 4 de 5 (Aula 8) — grava um LogEvento TROCA_CONCLUIDA no MongoDB.
+ * Listener 4 de 5 (Aula 8) — grava um LogEvento INFO_GERAL (troca concluída) no MongoDB.
  *
  * Só conhece o LogEventoService, que por sua vez só conhece a porta
  * RegistroDeEventos (Adapter). Este listener nem sabe que existe Mongo.
@@ -30,7 +30,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 @RequiredArgsConstructor
 public class RegistrarLogEventoListener {
 
-    public static final String TIPO = "TROCA_CONCLUIDA";
+    public static final String TIPO = "INFO_GERAL"; // tipo do projeto de referência para a troca concluída
 
     private final LogEventoService logEventoService;
 

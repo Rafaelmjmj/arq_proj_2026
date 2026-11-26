@@ -29,7 +29,7 @@ public class RegistrarHistoricoListener {
                 proposta,
                 "Troca concluída",
                 Status.NEGOCIADO_RAIZ,
-                Status.FINALIZADO,
+                Status.FINALIZADA,
                 evento.dataConclusao(),
                 null
         );

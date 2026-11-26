@@ -1,0 +1,64 @@
+%% Diagrama de sequência V2: PATCH /propostas/{id}/finalizar como o código faz hoje.
+%% Aulas 9 (Facade, Observer, Strategy), 10 (@Version, UPDATE atômico, AFTER_COMMIT),
+%% 11 (exceções em ProblemDetail) e 13 (retry e disjuntor).
+sequenceDiagram
+    autonumber
+    actor Cliente
+    participant C as PropostaController
+    participant S as PropostaService<br/>«Facade»
+    participant P as Proposta<br/>«State»
+    participant PG as Postgres
+    participant LT as Listeners na transação<br/>Créditos · Avaliação · Histórico
+    participant LOG as RegistrarLogEvento<br/>Listener
+    participant NL as NotificarUsuarios<br/>Listener
+    participant PILHA as NotificacaoComRetry<br/>→ ComDisjuntor<br/>→ SimuladaAdapter
+    participant MG as MongoDB
+    participant H as GlobalExceptionHandler
+
+    Cliente->>C: PATCH /propostas/{id}/finalizar
+    C->>S: finalizarNegociacao(id)
+
+    rect rgba(120, 120, 255, 0.12)
+        Note over S,LT: @Transactional
+        S->>PG: findById(id)
+        PG-->>S: Proposta (versao = N)
+        S->>P: finalizar()
+        opt raiz fora de NEGOCIADO_RAIZ (ex.: RASCUNHO ou já FINALIZADA)
+            P--)H: TransicaoInvalidaException
+            H-->>Cliente: 409 ProblemDetail<br/>PROPOSTA_TRANSICAO_INVALIDA
+        end
+        P->>P: raiz → FINALIZADA<br/>vencedora fica NEGOCIADO_CONTRA<br/>concorrentes → CANCELADO_CONTRA
+        S->>S: atrasoDemo.aplicar()<br/>(0 ms, ou 2000 ms na demo da Aula 10)
+        S->>PG: save(proposta)
+        S->>LT: publishEvent(TrocaConcluidaEvent)
+        LT->>PG: créditos: Strategy por categoria +<br/>UPDATE saldo = saldo + :valor (ordem de id)
+        LT->>PG: 2 avaliações PENDENTE + histórico
+        S->>PG: COMMIT<br/>update proposta ... where versao = N
+    end
+
+    alt outra requisição gravou antes (versao ≠ N)
+        PG--)S: OptimisticLockingFailureException → ROLLBACK<br/>(créditos, avaliações e histórico desfeitos)
+        S->>MG: AFTER_ROLLBACK: FINALIZACAO_RECUSADA
+        S--)H: exceção
+        H-->>Cliente: 409 ProblemDetail<br/>PROPOSTA_ALTERADA_CONCORRENTEMENTE
+    else commit ok
+        Note over LOG,MG: AFTER_COMMIT: só roda depois que a troca foi gravada<br/>o que é enviado não volta atrás
+        S->>LOG: aoConcluirTroca(evento)
+        LOG->>MG: INFO_GERAL (troca concluída)
+        S->>NL: aoConcluirTroca(evento)
+        loop para cada usuário (A e B)
+            NL->>PILHA: notificar(usuarioId, mensagem)
+            alt serviço no ar
+                PILHA-->>NL: enviada
+            else serviço fora, disjuntor fechado
+                PILHA->>PILHA: até 3 tentativas (200, 400 ms)<br/>5 falhas seguidas abrem o disjuntor
+                PILHA--)NL: NotificacaoIndisponivelException
+                NL->>MG: ERRO_SISTEMA (nada sobe)
+            else disjuntor aberto
+                PILHA->>MG: NOTIFICACAO_PENDENTE
+                PILHA-->>NL: retorna normalmente (nem tenta o serviço)
+            end
+        end
+        S-->>C: Proposta (FINALIZADA)
+        C-->>Cliente: 200 PropostaResponseDTO
+    end

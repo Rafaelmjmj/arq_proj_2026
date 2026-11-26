@@ -42,7 +42,8 @@ public class AvaliacaoService {
     @Transactional
     public Avaliacao avaliar(Long id, Long usuarioId, int nota, String descricao) {
         Avaliacao avaliacao = buscarPorId(id);
-        Usuario quemAvalia = usuarioService.buscarPorId(usuarioId);
+        // Quem avalia é opcional (ainda não há login): sem ele, a checagem de autoria é pulada.
+        Usuario quemAvalia = usuarioId == null ? null : usuarioService.buscarPorId(usuarioId);
         avaliacao.avaliar(quemAvalia, nota, descricao);
         return avaliacaoRepository.save(avaliacao);
     }

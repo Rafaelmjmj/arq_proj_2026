@@ -32,7 +32,7 @@ public final class Fixtures {
     /** Proposta raiz já levada até Ativa (Rascunho → Homologação → Ativa). */
     public static Proposta propostaAtiva(Usuario dono, Item item) {
         Proposta proposta = new Proposta("Troco " + item.getTitulo(), "Proposta de teste", dono, item);
-        proposta.submeter();
+        proposta.enviarParaHomologacao();
         proposta.aprovar();
         return proposta;
     }
@@ -40,7 +40,7 @@ public final class Fixtures {
     /** Contraproposta já enviada (Em Análise). */
     public static Proposta contrapropostaEmAnalise(Proposta raiz, Usuario autor, Item item) {
         Proposta contra = Proposta.criarContraProposta("Ofereço " + item.getTitulo(), autor, item, raiz);
-        contra.submeter();
+        contra.enviarParaAnalise();
         return contra;
     }
 }

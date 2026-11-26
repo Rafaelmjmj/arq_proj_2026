@@ -4,9 +4,9 @@ import com.trokr.notificacao.SimulacaoNotificacao;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -30,20 +30,25 @@ public class DemoNotificacaoController {
     @Operation(summary = "Derruba o serviço de notificação",
             description = "Toda chamada passa a falhar. Finalize trocas e veja em GET /logs as tentativas, "
                     + "o disjuntor abrindo e as NOTIFICACAO_PENDENTE.")
-    @ApiResponse(responseCode = "204", description = "Serviço fora do ar")
+    @ApiResponse(responseCode = "200", description = "Serviço fora do ar")
     @PatchMapping("/fora-do-ar")
-    public ResponseEntity<Void> derrubar() {
+    public Map<String, String> derrubar() {
         simulacao.derrubar();
-        return ResponseEntity.noContent().build();
+        return estado();
     }
 
     @Operation(summary = "Religa o serviço de notificação",
             description = "Nenhuma chamada falha. Se o disjuntor estiver aberto, ele fecha na primeira "
                     + "notificação depois do tempo-aberto (30 s).")
-    @ApiResponse(responseCode = "204", description = "Serviço no ar")
+    @ApiResponse(responseCode = "200", description = "Serviço no ar")
     @PatchMapping("/no-ar")
-    public ResponseEntity<Void> religar() {
+    public Map<String, String> religar() {
         simulacao.religar();
-        return ResponseEntity.noContent().build();
+        return estado();
+    }
+
+    /** 200 com o estado atual do interruptor, como no roteiro de referência (CT-T01). */
+    private Map<String, String> estado() {
+        return Map.of("servicoNotificacao", simulacao.foraDoAr() ? "FORA_DO_AR" : "NO_AR");
     }
 }

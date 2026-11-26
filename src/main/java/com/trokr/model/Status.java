@@ -8,7 +8,7 @@ public enum Status {
     HOMOLOGACAO,
     ATIVA,
     NEGOCIADO_RAIZ,
-    FINALIZADO,
+    FINALIZADA,
     CANCELADO_RAIZ,
 
     // Status das contrapropostas, rascunho é reaproveitado

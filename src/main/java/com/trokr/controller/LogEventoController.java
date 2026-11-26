@@ -23,7 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
  * ninguém aqui sabe que por baixo é Mongo.
  */
 @Tag(name = "Logs", description = "Log de eventos do sistema, guardado no MongoDB atrás da porta RegistroDeEventos. "
-        + "Tipos úteis: TROCA_CONCLUIDA, TRANSICAO_INVALIDA, ERRO_SISTEMA, NOTIFICACAO_PENDENTE.")
+        + "Tipos úteis: INFO_GERAL, TRANSICAO_INVALIDA, ERRO_SISTEMA, NOTIFICACAO_PENDENTE.")
 @RestController
 @RequestMapping("/logs")
 @RequiredArgsConstructor
@@ -31,7 +31,7 @@ public class LogEventoController {
 
     private final LogEventoService logEventoService;
 
-    /** Ex.: GET /logs?tipo=TROCA_CONCLUIDA */
+    /** Ex.: GET /logs?tipo=INFO_GERAL */
     @Operation(summary = "Lista eventos de um tipo")
     @GetMapping
     public List<LogEventoResponseDTO> listarPorTipo(
